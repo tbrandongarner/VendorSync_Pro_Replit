@@ -9,7 +9,7 @@ import Dashboard from "@/pages/dashboard";
 import Vendors from "@/pages/vendors";
 import Products from "@/pages/products";
 import Stores from "@/pages/stores";
-import Synchronization from "@/pages/synchronization";
+import SyncManager from "@/pages/sync-manager";
 import AiContent from "@/pages/ai-content";
 import Analytics from "@/pages/analytics";
 import Settings from "@/pages/settings";
@@ -37,7 +37,7 @@ function Router() {
           <Route path="/vendors" component={Vendors} />
           <Route path="/products" component={Products} />
           <Route path="/stores" component={Stores} />
-          <Route path="/sync" component={Synchronization} />
+          <Route path="/sync" component={SyncManager} />
           <Route path="/ai" component={AiContent} />
           <Route path="/analytics" component={Analytics} />
           <Route path="/settings" component={Settings} />

@@ -45,7 +45,12 @@ export const stores = pgTable("stores", {
   name: varchar("name").notNull(),
   shopifyStoreUrl: varchar("shopify_store_url").notNull(),
   shopifyAccessToken: varchar("shopify_access_token"),
+  shopifyWebhookSecret: varchar("shopify_webhook_secret"),
+  shopifyScope: varchar("shopify_scope"),
+  currency: varchar("currency").default("USD"),
+  timezone: varchar("timezone").default("UTC"),
   isActive: boolean("is_active").default(true),
+  lastSyncAt: timestamp("last_sync_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -194,62 +194,221 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/sync/start', isAuthenticated, async (req: any, res) => {
     try {
-      const { vendorId, storeId } = req.body;
+      const { vendorId, storeId, direction = 'bidirectional', options = {} } = req.body;
       const userId = req.user.claims.sub;
       
-      // Create sync job
-      const syncJob = await storage.createSyncJob({
-        vendorId,
-        storeId,
-        status: 'pending',
-        totalItems: 0,
-        processedItems: 0,
+      if (!vendorId || !storeId) {
+        return res.status(400).json({ message: "Vendor ID and Store ID are required" });
+      }
+
+      const store = await storage.getStore(storeId);
+      if (!store) {
+        return res.status(404).json({ message: "Store not found" });
+      }
+
+      if (!store.shopifyAccessToken) {
+        return res.status(400).json({ message: "Store is not properly configured with Shopify access token" });
+      }
+
+      // Import sync service dynamically to avoid circular dependencies
+      const { ProductSyncService } = await import('./services/sync');
+      const syncService = new ProductSyncService(store);
+
+      // Start sync process in background
+      setImmediate(async () => {
+        try {
+          const result = await syncService.syncProducts(vendorId, {
+            direction,
+            syncImages: options.syncImages !== false,
+            syncInventory: options.syncInventory !== false,
+            syncPricing: options.syncPricing !== false,
+            syncTags: options.syncTags !== false,
+            syncVariants: options.syncVariants !== false,
+            syncDescriptions: options.syncDescriptions !== false,
+            batchSize: options.batchSize || 50,
+          });
+
+          // Log activity
+          await storage.createActivity({
+            userId,
+            type: 'vendor_sync',
+            description: `Sync completed: ${result.created} created, ${result.updated} updated, ${result.failed} failed`,
+            metadata: { vendorId, storeId, result }
+          });
+        } catch (error) {
+          console.error("Sync process failed:", error);
+          await storage.createActivity({
+            userId,
+            type: 'vendor_sync',
+            description: `Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            metadata: { vendorId, storeId, error: error instanceof Error ? error.message : 'Unknown error' }
+          });
+        }
       });
-      
-      // Simulate sync process (in real implementation, this would be a background job)
-      setTimeout(async () => {
-        // Update to running
-        await storage.updateSyncJob(syncJob.id, {
-          status: 'running',
-          startedAt: new Date(),
-          totalItems: 100,
-        });
-        
-        const wsService = getWebSocketService();
-        if (wsService) {
-          wsService.sendSyncUpdate(userId, { ...syncJob, status: 'running', totalItems: 100 });
-        }
-        
-        // Simulate progress updates
-        for (let i = 0; i <= 100; i += 10) {
-          setTimeout(async () => {
-            await storage.updateSyncJob(syncJob.id, {
-              processedItems: i,
-              progress: i,
-            });
-            
-            if (wsService) {
-              wsService.sendSyncUpdate(userId, { ...syncJob, processedItems: i, progress: i });
-            }
-            
-            if (i === 100) {
-              await storage.updateSyncJob(syncJob.id, {
-                status: 'completed',
-                completedAt: new Date(),
-              });
-              
-              if (wsService) {
-                wsService.sendSyncUpdate(userId, { ...syncJob, status: 'completed' });
-              }
-            }
-          }, i * 100);
-        }
-      }, 1000);
-      
-      res.json(syncJob);
+
+      res.json({ message: "Sync started successfully" });
     } catch (error) {
       console.error("Error starting sync:", error);
       res.status(500).json({ message: "Failed to start sync" });
+    }
+  });
+
+  // Individual product sync
+  app.post('/api/products/:id/sync', isAuthenticated, async (req: any, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const { direction = 'bidirectional' } = req.body;
+      
+      const product = await storage.getProduct(productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const store = await storage.getStore(product.storeId);
+      if (!store || !store.shopifyAccessToken) {
+        return res.status(400).json({ message: "Store not properly configured" });
+      }
+
+      const { ProductSyncService } = await import('./services/sync');
+      const syncService = new ProductSyncService(store);
+      
+      const result = await syncService.syncSingleProduct(productId, direction);
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error syncing product:", error);
+      res.status(500).json({ message: "Failed to sync product" });
+    }
+  });
+
+  // Update product inventory
+  app.post('/api/products/:id/inventory', isAuthenticated, async (req: any, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const { quantity, locationId } = req.body;
+      
+      if (typeof quantity !== 'number' || quantity < 0) {
+        return res.status(400).json({ message: "Valid quantity is required" });
+      }
+
+      const product = await storage.getProduct(productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const store = await storage.getStore(product.storeId);
+      if (!store || !store.shopifyAccessToken) {
+        return res.status(400).json({ message: "Store not properly configured" });
+      }
+
+      const { ProductSyncService } = await import('./services/sync');
+      const syncService = new ProductSyncService(store);
+      
+      await syncService.updateProductInventory(productId, quantity, locationId);
+      
+      res.json({ message: "Inventory updated successfully" });
+    } catch (error) {
+      console.error("Error updating inventory:", error);
+      res.status(500).json({ message: "Failed to update inventory" });
+    }
+  });
+
+  // Update product pricing
+  app.post('/api/products/:id/pricing', isAuthenticated, async (req: any, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const { price, compareAtPrice } = req.body;
+      
+      if (typeof price !== 'number' || price <= 0) {
+        return res.status(400).json({ message: "Valid price is required" });
+      }
+
+      const product = await storage.getProduct(productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const store = await storage.getStore(product.storeId);
+      if (!store || !store.shopifyAccessToken) {
+        return res.status(400).json({ message: "Store not properly configured" });
+      }
+
+      const { ProductSyncService } = await import('./services/sync');
+      const syncService = new ProductSyncService(store);
+      
+      await syncService.updateProductPricing(productId, price, compareAtPrice);
+      
+      res.json({ message: "Pricing updated successfully" });
+    } catch (error) {
+      console.error("Error updating pricing:", error);
+      res.status(500).json({ message: "Failed to update pricing" });
+    }
+  });
+
+  // Update product images
+  app.post('/api/products/:id/images', isAuthenticated, async (req: any, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const { images } = req.body;
+      
+      if (!Array.isArray(images) || images.length === 0) {
+        return res.status(400).json({ message: "Images array is required" });
+      }
+
+      const product = await storage.getProduct(productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const store = await storage.getStore(product.storeId);
+      if (!store || !store.shopifyAccessToken) {
+        return res.status(400).json({ message: "Store not properly configured" });
+      }
+
+      const { ProductSyncService } = await import('./services/sync');
+      const syncService = new ProductSyncService(store);
+      
+      await syncService.updateProductImages(productId, images);
+      
+      res.json({ message: "Images updated successfully" });
+    } catch (error) {
+      console.error("Error updating images:", error);
+      res.status(500).json({ message: "Failed to update images" });
+    }
+  });
+
+  // Test Shopify connection
+  app.post('/api/stores/:id/test', isAuthenticated, async (req: any, res) => {
+    try {
+      const storeId = parseInt(req.params.id);
+      const store = await storage.getStore(storeId);
+      
+      if (!store) {
+        return res.status(404).json({ message: "Store not found" });
+      }
+
+      if (!store.shopifyAccessToken) {
+        return res.status(400).json({ message: "Store access token not configured" });
+      }
+
+      const { ShopifyService } = await import('./services/shopify');
+      const shopifyService = new ShopifyService(store);
+      
+      // Test connection by fetching a small number of products
+      const testResult = await shopifyService.getProducts(1);
+      
+      res.json({ 
+        success: true, 
+        message: "Connection successful",
+        productsCount: testResult.products.length
+      });
+    } catch (error) {
+      console.error("Error testing Shopify connection:", error);
+      res.status(400).json({ 
+        success: false, 
+        message: "Connection failed",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 
