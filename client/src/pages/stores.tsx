@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Store, ExternalLink, Settings } from "lucide-react";
+import { Plus, Store, ExternalLink, Settings, AlertCircle, CheckCircle2, Copy } from "lucide-react";
 
 export default function Stores() {
   const { isAuthenticated } = useAuth();
@@ -95,6 +95,50 @@ export default function Stores() {
       <TopBar title="Stores" subtitle="Manage your connected Shopify stores" />
       
       <div className="p-6 space-y-6">
+        {/* Setup Guide Card */}
+        {stores.length === 0 && (
+          <Card className="border-blue-200 bg-blue-50">
+            <CardContent className="pt-6">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0">
+                  <div className="bg-blue-100 p-3 rounded-lg">
+                    <Store className="w-6 h-6 text-blue-600" />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <h3 className="font-semibold text-blue-900">Set up your first Shopify store</h3>
+                    <p className="text-blue-700 text-sm mt-1">
+                      Connect your Shopify store to start syncing products with your vendors
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center space-x-2">
+                      <span className="bg-blue-600 text-white px-2 py-1 rounded-full text-xs">1</span>
+                      <span>Go to your Shopify admin → Settings → Apps and sales channels</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="bg-blue-600 text-white px-2 py-1 rounded-full text-xs">2</span>
+                      <span>Create a private app with Admin API permissions</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="bg-blue-600 text-white px-2 py-1 rounded-full text-xs">3</span>
+                      <span>Copy the access token and paste it when connecting your store</span>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-2">
+                    <p className="text-xs text-blue-600 font-medium">
+                      Need help? Click "Connect Store" for detailed setup instructions.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Header Actions */}
         <div className="flex justify-between items-center">
           <div>
@@ -111,7 +155,7 @@ export default function Stores() {
                 Connect Store
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
               <form onSubmit={handleSubmit}>
                 <DialogHeader>
                   <DialogTitle>Connect Shopify Store</DialogTitle>
@@ -144,17 +188,84 @@ export default function Stores() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="token">Shopify Access Token</Label>
+                    <Label htmlFor="token">Shopify Admin API Access Token</Label>
                     <Input
                       id="token"
                       type="password"
-                      placeholder="Optional - for advanced sync features"
+                      placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                       value={formData.shopifyAccessToken}
                       onChange={(e) => setFormData(prev => ({ ...prev, shopifyAccessToken: e.target.value }))}
                     />
                     <p className="text-xs text-gray-500">
                       Required for automatic product sync and inventory updates
                     </p>
+                  </div>
+
+                  {/* Setup Instructions */}
+                  <div className="border-t pt-4 space-y-3">
+                    <h4 className="font-medium flex items-center text-sm">
+                      <AlertCircle className="w-4 h-4 mr-2 text-orange-500" />
+                      How to get your Shopify Admin API Access Token:
+                    </h4>
+                    
+                    <div className="space-y-2 text-xs text-gray-600">
+                      <div className="flex items-start space-x-2">
+                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">1</span>
+                        <div>
+                          <p className="font-medium">Go to your Shopify admin panel</p>
+                          <p>Navigate to Settings → Apps and sales channels</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start space-x-2">
+                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">2</span>
+                        <div>
+                          <p className="font-medium">Create a Private App</p>
+                          <p>Click "Develop apps" → "Create an app" → "Create a private app"</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start space-x-2">
+                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">3</span>
+                        <div>
+                          <p className="font-medium">Configure Admin API scopes</p>
+                          <p>Enable these permissions for full VendorSync functionality:</p>
+                          <div className="bg-gray-50 p-2 rounded mt-1 space-y-1">
+                            <p>• <code className="text-xs bg-gray-200 px-1 rounded">read_products</code> - Read product data</p>
+                            <p>• <code className="text-xs bg-gray-200 px-1 rounded">write_products</code> - Create/update products</p>
+                            <p>• <code className="text-xs bg-gray-200 px-1 rounded">read_inventory</code> - Read inventory levels</p>
+                            <p>• <code className="text-xs bg-gray-200 px-1 rounded">write_inventory</code> - Update inventory</p>
+                            <p>• <code className="text-xs bg-gray-200 px-1 rounded">read_locations</code> - Read store locations</p>
+                            <p>• <code className="text-xs bg-gray-200 px-1 rounded">read_product_listings</code> - Read product listings</p>
+                            <p>• <code className="text-xs bg-gray-200 px-1 rounded">write_product_listings</code> - Manage product listings</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start space-x-2">
+                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">4</span>
+                        <div>
+                          <p className="font-medium">Install the app and copy the token</p>
+                          <p>After installation, copy the "Admin API access token" (starts with shpat_)</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-green-50 p-3 rounded-lg">
+                      <div className="flex items-start space-x-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5" />
+                        <div className="text-xs">
+                          <p className="font-medium text-green-800">✓ With these permissions, VendorSync can:</p>
+                          <ul className="text-green-700 mt-1 space-y-1">
+                            <li>• Sync products between vendors and your store</li>
+                            <li>• Update product prices and inventory levels</li>
+                            <li>• Manage product images and descriptions</li>
+                            <li>• Handle product variants and options</li>
+                            <li>• Track sync progress in real-time</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 
