@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Settings, User, Bell, Shield, Key, Zap, Database, LogOut } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Shield, Key, Zap, Database, LogOut } from "lucide-react";
 
 export default function Settings() {
   const { user } = useAuth();
