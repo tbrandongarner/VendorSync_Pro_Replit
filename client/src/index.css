@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(20, 14.3%, 4.1%);
+  --muted: hsl(60, 4.8%, 95.9%);
+  --muted-foreground: hsl(25, 5.3%, 44.7%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(20, 14.3%, 4.1%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(20, 14.3%, 4.1%);
+  --border: hsl(20, 5.9%, 90%);
+  --input: hsl(20, 5.9%, 90%);
+  --primary: hsl(152, 100%, 25%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(60, 4.8%, 95.9%);
+  --secondary-foreground: hsl(24, 9.8%, 10%);
+  --accent: hsl(60, 4.8%, 95.9%);
+  --accent-foreground: hsl(24, 9.8%, 10%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --destructive-foreground: hsl(60, 9.1%, 97.8%);
+  --ring: hsl(20, 14.3%, 4.1%);
+  --radius: 0.5rem;
+  
+  /* Shopify inspired colors */
+  --shopify-primary: hsl(152, 100%, 25%);
+  --shopify-secondary: hsl(250, 60%, 60%);
+  --shopify-accent: hsl(43, 100%, 50%);
+  --shopify-surface: hsl(210, 17%, 98%);
+  --shopify-border: hsl(210, 11%, 89%);
+  --shopify-text: hsl(213, 7%, 13%);
+  --shopify-text-secondary: hsl(210, 5%, 44%);
+  --shopify-critical: hsl(12, 78%, 54%);
+  --shopify-warning: hsl(40, 95%, 64%);
+  --shopify-success: hsl(152, 100%, 25%);
+  --shopify-highlight: hsl(250, 60%, 60%);
+}
+
+.dark {
+  --background: hsl(240, 10%, 3.9%);
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 3.7%, 15.9%);
+  --muted-foreground: hsl(240, 5%, 64.9%);
+  --popover: hsl(240, 10%, 3.9%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 3.9%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(240, 3.7%, 15.9%);
+  --input: hsl(240, 3.7%, 15.9%);
+  --primary: hsl(152, 100%, 25%);
+  --primary-foreground: hsl(211, 100%, 99%);
+  --secondary: hsl(240, 3.7%, 15.9%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(240, 3.7%, 15.9%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(240, 4.9%, 83.9%);
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .polaris-shadow {
+    box-shadow: 0 0 0 1px rgba(63,63,68,0.05), 0 1px 3px 0 rgba(63,63,68,0.15);
+  }
+  
+  .polaris-shadow-hover {
+    box-shadow: 0 0 0 1px rgba(63,63,68,0.05), 0 2px 8px 0 rgba(63,63,68,0.15);
+  }
+  
+  .sidebar-width {
+    width: 240px;
+  }
+  
+  .main-content {
+    margin-left: 240px;
+  }
+  
+  @media (max-width: 768px) {
+    .sidebar-width {
+      width: 100%;
+      position: fixed;
+      top: 0;
+      left: -100%;
+      transition: left 0.3s ease;
+      z-index: 50;
+    }
+    .sidebar-open {
+      left: 0;
+    }
+    .main-content {
+      margin-left: 0;
+    }
+  }
+}
+
+@layer utilities {
+  .shopify-primary {
+    background-color: var(--shopify-primary);
+  }
+  
+  .shopify-secondary {
+    background-color: var(--shopify-secondary);
+  }
+  
+  .shopify-accent {
+    background-color: var(--shopify-accent);
+  }
+  
+  .shopify-surface {
+    background-color: var(--shopify-surface);
+  }
+  
+  .shopify-border {
+    border-color: var(--shopify-border);
+  }
+  
+  .shopify-text {
+    color: var(--shopify-text);
+  }
+  
+  .shopify-text-secondary {
+    color: var(--shopify-text-secondary);
+  }
+  
+  .shopify-critical {
+    background-color: var(--shopify-critical);
+  }
+  
+  .shopify-warning {
+    background-color: var(--shopify-warning);
+  }
+  
+  .shopify-success {
+    background-color: var(--shopify-success);
+  }
+  
+  .shopify-highlight {
+    background-color: var(--shopify-highlight);
+  }
+}
