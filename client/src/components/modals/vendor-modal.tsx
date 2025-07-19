@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, Save, X } from "lucide-react";
+import FileUpload from "@/components/ui/file-upload";
 
 interface VendorModalProps {
   isOpen: boolean;
@@ -24,9 +25,10 @@ export default function VendorModal({ isOpen, onClose, vendor }: VendorModalProp
     contactEmail: "",
     logoUrl: "",
     commissionRate: "",
-    syncFrequency: "real-time",
-    apiEndpoint: "",
-    apiKey: "",
+    syncFrequency: "daily",
+    dataSourceType: "csv_upload",
+    dataSourceUrl: "",
+    dataSourceConfig: "",
     notes: "",
   });
 
@@ -38,9 +40,10 @@ export default function VendorModal({ isOpen, onClose, vendor }: VendorModalProp
         contactEmail: vendor.contactEmail || "",
         logoUrl: vendor.logoUrl || "",
         commissionRate: vendor.commissionRate || "",
-        syncFrequency: vendor.syncFrequency || "real-time",
-        apiEndpoint: vendor.apiEndpoint || "",
-        apiKey: vendor.apiKey || "",
+        syncFrequency: vendor.syncFrequency || "daily",
+        dataSourceType: vendor.dataSourceType || "csv_upload",
+        dataSourceUrl: vendor.dataSourceUrl || "",
+        dataSourceConfig: vendor.dataSourceConfig || "",
         notes: vendor.notes || "",
       });
     } else {
@@ -49,9 +52,10 @@ export default function VendorModal({ isOpen, onClose, vendor }: VendorModalProp
         contactEmail: "",
         logoUrl: "",
         commissionRate: "",
-        syncFrequency: "real-time",
-        apiEndpoint: "",
-        apiKey: "",
+        syncFrequency: "daily",
+        dataSourceType: "csv_upload",
+        dataSourceUrl: "",
+        dataSourceConfig: "",
         notes: "",
       });
     }
@@ -224,35 +228,98 @@ export default function VendorModal({ isOpen, onClose, vendor }: VendorModalProp
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="real-time">Real-time</SelectItem>
                   <SelectItem value="hourly">Every hour</SelectItem>
                   <SelectItem value="daily">Daily</SelectItem>
                   <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="manual">Manual only</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="apiEndpoint">API Endpoint</Label>
-            <Input
-              id="apiEndpoint"
-              type="url"
-              placeholder="https://vendor-api.example.com"
-              value={formData.apiEndpoint}
-              onChange={(e) => setFormData(prev => ({ ...prev, apiEndpoint: e.target.value }))}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="apiKey">API Key</Label>
-            <Input
-              id="apiKey"
-              type="password"
-              placeholder="Enter API key for vendor integration"
-              value={formData.apiKey}
-              onChange={(e) => setFormData(prev => ({ ...prev, apiKey: e.target.value }))}
-            />
+
+          <div className="space-y-4 border-t pt-4">
+            <h4 className="font-semibold flex items-center">
+              <Upload className="w-4 h-4 mr-2" />
+              Product Data Source
+            </h4>
+            
+            <div className="space-y-2">
+              <Label htmlFor="dataSourceType">Data Source Type</Label>
+              <Select value={formData.dataSourceType} onValueChange={(value) => setFormData(prev => ({ ...prev, dataSourceType: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="csv_upload">CSV File Upload</SelectItem>
+                  <SelectItem value="excel_upload">Excel File Upload</SelectItem>
+                  <SelectItem value="google_sheets">Google Sheets</SelectItem>
+                  <SelectItem value="api">API Connection</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(formData.dataSourceType === 'google_sheets' || formData.dataSourceType === 'api') && (
+              <div className="space-y-2">
+                <Label htmlFor="dataSourceUrl">
+                  {formData.dataSourceType === 'google_sheets' ? 'Google Sheets Share URL' : 'API Endpoint'}
+                </Label>
+                <Input
+                  id="dataSourceUrl"
+                  type="url"
+                  placeholder={
+                    formData.dataSourceType === 'google_sheets' 
+                      ? "https://docs.google.com/spreadsheets/d/..." 
+                      : "https://vendor-api.example.com"
+                  }
+                  value={formData.dataSourceUrl}
+                  onChange={(e) => setFormData(prev => ({ ...prev, dataSourceUrl: e.target.value }))}
+                />
+                <p className="text-xs text-gray-500">
+                  {formData.dataSourceType === 'google_sheets' 
+                    ? "Make sure the Google Sheet is publicly viewable or shared with the appropriate permissions"
+                    : "REST API endpoint that returns product data"
+                  }
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="dataSourceConfig">Column Mapping (Optional)</Label>
+              <Textarea
+                id="dataSourceConfig"
+                placeholder={`Configure column mappings (JSON format):
+{
+  "sku_column": "SKU",
+  "name_column": "Product Name", 
+  "price_column": "Price",
+  "description_column": "Description",
+  "inventory_column": "Stock"
+}`}
+                value={formData.dataSourceConfig}
+                onChange={(e) => setFormData(prev => ({ ...prev, dataSourceConfig: e.target.value }))}
+                rows={6}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-gray-500">
+                Map your spreadsheet columns to product fields. Leave empty to use default mapping.
+              </p>
+            </div>
+
+            {vendor && (formData.dataSourceType === 'csv_upload' || formData.dataSourceType === 'excel_upload') && (
+              <div className="mt-4">
+                <Label>Upload Product File</Label>
+                <FileUpload 
+                  vendorId={vendor.id} 
+                  dataSourceType={formData.dataSourceType}
+                  onUploadSuccess={(data) => {
+                    toast({
+                      title: "File processed successfully",
+                      description: `${data.validProducts} products ready for sync`,
+                    });
+                  }}
+                />
+              </div>
+            )}
           </div>
           
           <div className="space-y-2">

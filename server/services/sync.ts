@@ -2,6 +2,7 @@ import { ShopifyService } from './shopify';
 import { storage } from '../storage';
 import { Store, Product, SyncJob, Vendor } from '@shared/schema';
 import { getWebSocketService } from './websocket';
+import { parseCSV, parseExcel, parseGoogleSheets, ParsedProduct, DataSourceConfig } from './file-parser';
 
 export interface SyncOptions {
   direction: 'push' | 'pull' | 'bidirectional';
@@ -69,13 +70,18 @@ export class ProductSyncService {
         totalProcessed: 0,
       };
 
+      // First, get vendor product data from their data source
+      const vendorProducts = await this.getVendorProducts(vendor);
+      
+      // Then, sync with Shopify using SKU as primary identifier
       if (options.direction === 'pull' || options.direction === 'bidirectional') {
-        const pullResult = await this.pullFromShopify(vendor, syncJob.id, options);
+        const pullResult = await this.syncWithShopifyBySKU(vendor, vendorProducts, syncJob.id, options);
         result = this.mergeResults(result, pullResult);
       }
 
       if (options.direction === 'push' || options.direction === 'bidirectional') {
-        const pushResult = await this.pushToShopify(vendor, syncJob.id, options);
+        // Push vendor products to Shopify store
+        const pushResult = await this.pushVendorProductsToShopify(vendor, vendorProducts, syncJob.id, options);
         result = this.mergeResults(result, pushResult);
       }
 
@@ -457,5 +463,246 @@ export class ProductSyncService {
         progress: total > 0 ? Math.round((processed / total) * 100) : 0,
       });
     }
+  }
+
+  // New methods for file-based sync
+  private async getVendorProducts(vendor: Vendor): Promise<ParsedProduct[]> {
+    if (!vendor.dataSourceType) {
+      return [];
+    }
+
+    let config: DataSourceConfig = {};
+    if (vendor.dataSourceConfig) {
+      try {
+        config = JSON.parse(vendor.dataSourceConfig as string);
+      } catch (error) {
+        console.warn('Failed to parse vendor data source config:', error);
+      }
+    }
+
+    switch (vendor.dataSourceType) {
+      case 'google_sheets':
+        if (!vendor.dataSourceUrl) {
+          throw new Error('Google Sheets URL is required');
+        }
+        return await parseGoogleSheets(vendor.dataSourceUrl, config);
+      
+      case 'csv_upload':
+      case 'excel_upload':
+        // For file uploads, we'd need to handle the uploaded files
+        // For now, return empty array - this would be handled by file upload endpoint
+        return [];
+      
+      case 'api':
+        if (!vendor.dataSourceUrl) {
+          throw new Error('API endpoint URL is required');
+        }
+        return await this.fetchFromVendorAPI(vendor.dataSourceUrl, config);
+      
+      default:
+        return [];
+    }
+  }
+
+  private async fetchFromVendorAPI(apiUrl: string, config: DataSourceConfig): Promise<ParsedProduct[]> {
+    try {
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      // Assume API returns array of products
+      if (!Array.isArray(data)) {
+        throw new Error('API must return an array of products');
+      }
+
+      return data.map(item => this.mapAPIResponseToProduct(item, config));
+    } catch (error) {
+      throw new Error(`Failed to fetch from vendor API: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private mapAPIResponseToProduct(item: any, config: DataSourceConfig): ParsedProduct {
+    return {
+      sku: String(item[config.sku_column || 'sku'] || item.sku || '').trim(),
+      name: String(item[config.name_column || 'name'] || item.name || '').trim(),
+      description: item[config.description_column || 'description'] || item.description,
+      price: parseFloat(item[config.price_column || 'price'] || item.price || 0),
+      compareAtPrice: parseFloat(item[config.compare_price_column || 'compareAtPrice'] || item.compareAtPrice || 0),
+      inventory: parseInt(item[config.inventory_column || 'inventory'] || item.inventory || 0),
+      category: item[config.category_column || 'category'] || item.category,
+      barcode: item[config.barcode_column || 'barcode'] || item.barcode,
+      images: item[config.images_column || 'images'] || item.images || [],
+    };
+  }
+
+  private async syncWithShopifyBySKU(
+    vendor: Vendor,
+    vendorProducts: ParsedProduct[],
+    syncJobId: number,
+    options: SyncOptions
+  ): Promise<SyncResult> {
+    const result: SyncResult = {
+      success: true,
+      created: 0,
+      updated: 0,
+      failed: 0,
+      errors: [],
+      totalProcessed: 0,
+    };
+
+    if (vendorProducts.length === 0) {
+      return result;
+    }
+
+    try {
+      // Get all products from Shopify
+      const shopifyResponse = await this.shopifyService.getAllProducts();
+      const shopifyProducts = shopifyResponse.products;
+
+      // Create SKU-based lookup map
+      const shopifyProductsBySKU = new Map();
+      shopifyProducts.forEach(product => {
+        if (product.variants && product.variants.length > 0) {
+          product.variants.forEach(variant => {
+            if (variant.sku) {
+              shopifyProductsBySKU.set(variant.sku, { product, variant });
+            }
+          });
+        }
+      });
+
+      await storage.updateSyncJob(syncJobId, {
+        totalItems: vendorProducts.length,
+      });
+
+      // Process each vendor product
+      for (const vendorProduct of vendorProducts) {
+        try {
+          if (!vendorProduct.sku) {
+            result.failed++;
+            result.errors.push(`Product "${vendorProduct.name}" has no SKU - skipping`);
+            continue;
+          }
+
+          const shopifyMatch = shopifyProductsBySKU.get(vendorProduct.sku);
+          let dbProduct = await this.findExistingProductBySKU(vendorProduct.sku, vendor.id);
+
+          if (shopifyMatch) {
+            // Product exists in Shopify - update it
+            const shopifyProductData = this.convertVendorToShopifyProduct(vendorProduct);
+            
+            if (options.syncPricing && vendorProduct.price) {
+              shopifyProductData.variants[0].price = vendorProduct.price.toString();
+            }
+            if (options.syncInventory && vendorProduct.inventory !== undefined) {
+              shopifyProductData.variants[0].inventory_quantity = vendorProduct.inventory;
+            }
+
+            await this.shopifyService.updateProduct(shopifyMatch.product.id, shopifyProductData);
+
+            // Update or create database record
+            const productData = {
+              vendorId: vendor.id,
+              storeId: this.store.id,
+              shopifyProductId: shopifyMatch.product.id,
+              name: vendorProduct.name,
+              description: vendorProduct.description || null,
+              price: vendorProduct.price || null,
+              compareAtPrice: vendorProduct.compareAtPrice || null,
+              sku: vendorProduct.sku,
+              barcode: vendorProduct.barcode || null,
+              inventory: vendorProduct.inventory || 0,
+              category: vendorProduct.category || null,
+              images: vendorProduct.images ? JSON.stringify(vendorProduct.images) : null,
+              isActive: true,
+              lastSyncAt: new Date(),
+            };
+
+            if (dbProduct) {
+              await storage.updateProduct(dbProduct.id, productData);
+              result.updated++;
+            } else {
+              await storage.createProduct(productData as any);
+              result.created++;
+            }
+          } else {
+            // Product doesn't exist in Shopify - create it if pushing
+            if (options.direction === 'push' || options.direction === 'bidirectional') {
+              const shopifyProductData = this.convertVendorToShopifyProduct(vendorProduct);
+              const newShopifyProduct = await this.shopifyService.createProduct(shopifyProductData);
+
+              // Create database record
+              await storage.createProduct({
+                vendorId: vendor.id,
+                storeId: this.store.id,
+                shopifyProductId: newShopifyProduct.id,
+                name: vendorProduct.name,
+                description: vendorProduct.description || null,
+                price: vendorProduct.price || null,
+                compareAtPrice: vendorProduct.compareAtPrice || null,
+                sku: vendorProduct.sku,
+                barcode: vendorProduct.barcode || null,
+                inventory: vendorProduct.inventory || 0,
+                category: vendorProduct.category || null,
+                images: vendorProduct.images ? JSON.stringify(vendorProduct.images) : null,
+                isActive: true,
+                lastSyncAt: new Date(),
+              } as any);
+
+              result.created++;
+            }
+          }
+
+          result.totalProcessed++;
+          this.broadcastSyncUpdate(syncJobId, 'running', result.totalProcessed, vendorProducts.length);
+
+          // Rate limiting
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (error) {
+          result.failed++;
+          result.errors.push(`Failed to sync product ${vendorProduct.sku}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+    } catch (error) {
+      result.success = false;
+      result.errors.push(`Failed to sync with Shopify: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+    return result;
+  }
+
+  private async pushVendorProductsToShopify(
+    vendor: Vendor,
+    vendorProducts: ParsedProduct[],
+    syncJobId: number,
+    options: SyncOptions
+  ): Promise<SyncResult> {
+    // This method is similar to syncWithShopifyBySKU but focuses only on push operations
+    return this.syncWithShopifyBySKU(vendor, vendorProducts, syncJobId, { ...options, direction: 'push' });
+  }
+
+  private async findExistingProductBySKU(sku: string, vendorId: number): Promise<Product | null> {
+    const products = await storage.getVendorProducts(vendorId);
+    return products.find(p => p.sku === sku) || null;
+  }
+
+  private convertVendorToShopifyProduct(vendorProduct: ParsedProduct): any {
+    return {
+      title: vendorProduct.name,
+      body_html: vendorProduct.description || '',
+      product_type: vendorProduct.category || '',
+      vendor: '', // This could be set from vendor name
+      tags: [],
+      variants: [{
+        sku: vendorProduct.sku,
+        price: vendorProduct.price?.toString() || '0',
+        compare_at_price: vendorProduct.compareAtPrice?.toString() || null,
+        inventory_quantity: vendorProduct.inventory || 0,
+        barcode: vendorProduct.barcode || null,
+      }],
+      images: vendorProduct.images?.map(url => ({ src: url })) || [],
+    };
   }
 }

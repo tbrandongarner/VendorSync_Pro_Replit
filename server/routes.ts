@@ -5,6 +5,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { generateProductContent, generateProductDescription } from "./services/openai";
 import { initWebSocketService, getWebSocketService } from "./services/websocket";
 import { insertVendorSchema, insertStoreSchema, insertProductSchema } from "@shared/schema";
+import fileUploadRoutes from "./routes/file-upload";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
@@ -506,6 +507,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch AI generations" });
     }
   });
+
+  // File upload routes
+  app.use('/api/files', fileUploadRoutes);
 
   return httpServer;
 }

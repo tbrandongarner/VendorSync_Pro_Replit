@@ -62,9 +62,10 @@ export const vendors = pgTable("vendors", {
   contactEmail: varchar("contact_email").notNull(),
   logoUrl: varchar("logo_url"),
   commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }),
-  syncFrequency: varchar("sync_frequency").default("real-time"), // real-time, hourly, daily, weekly
-  apiEndpoint: varchar("api_endpoint"),
-  apiKey: varchar("api_key"),
+  syncFrequency: varchar("sync_frequency").default("daily"), // hourly, daily, weekly, manual
+  dataSourceType: varchar("data_source_type").default("csv_upload"), // csv_upload, excel_upload, google_sheets, api
+  dataSourceUrl: varchar("data_source_url"), // URL for Google Sheets or shared files
+  dataSourceConfig: jsonb("data_source_config"), // Column mappings and configuration
   notes: text("notes"),
   status: varchar("status").default("active"), // active, inactive, syncing, error
   lastSyncAt: timestamp("last_sync_at"),
@@ -81,7 +82,7 @@ export const products = pgTable("products", {
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }),
   compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
-  sku: varchar("sku"),
+  sku: varchar("sku").notNull(), // SKU is now primary identifier
   barcode: varchar("barcode"),
   inventory: integer("inventory").default(0),
   category: varchar("category"),
