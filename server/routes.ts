@@ -181,6 +181,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete('/api/products', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.deleteAllProducts();
+      
+      // Log activity
+      await storage.createActivity({
+        userId,
+        type: 'product_sync',
+        description: 'Deleted all products from database',
+        metadata: JSON.stringify({ action: 'delete_all' }),
+      });
+
+      res.json({ message: 'All products deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting all products:', error);
+      res.status(500).json({ message: 'Failed to delete products' });
+    }
+  });
+
+  app.delete('/api/products/vendor/:vendorId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const vendorId = parseInt(req.params.vendorId);
+      
+      if (isNaN(vendorId)) {
+        return res.status(400).json({ message: 'Invalid vendor ID' });
+      }
+
+      const vendor = await storage.getVendor(vendorId);
+      if (!vendor) {
+        return res.status(404).json({ message: 'Vendor not found' });
+      }
+
+      await storage.deleteVendorProducts(vendorId);
+      
+      // Log activity
+      await storage.createActivity({
+        userId,
+        type: 'product_sync',
+        description: `Deleted all products for vendor ${vendor.name}`,
+        metadata: JSON.stringify({ vendorId, vendorName: vendor.name, action: 'delete_vendor_products' }),
+      });
+
+      res.json({ message: `All products for vendor ${vendor.name} deleted successfully` });
+    } catch (error) {
+      console.error('Error deleting vendor products:', error);
+      res.status(500).json({ message: 'Failed to delete vendor products' });
+    }
+  });
+
   // Sync routes
   app.get('/api/sync/jobs', isAuthenticated, async (req: any, res) => {
     try {

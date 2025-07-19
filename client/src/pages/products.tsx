@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import TopBar from "@/components/layout/top-bar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,10 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Box, Filter, ExternalLink, Grid3X3, List, LayoutGrid } from "lucide-react";
+import { Search, Box, Filter, ExternalLink, Grid3X3, List, LayoutGrid, Trash } from "lucide-react";
 
 export default function Products() {
   const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedVendor, setSelectedVendor] = useState<string>("all");
   const [selectedStore, setSelectedStore] = useState<string>("all");
@@ -19,7 +22,7 @@ export default function Products() {
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"cards" | "list" | "grid">("cards");
 
-  const { data: products = [], isLoading: productsLoading } = useQuery({
+  const { data: products = [], isLoading: productsLoading, refetch: refetchProducts } = useQuery({
     queryKey: ["/api/products"],
     enabled: isAuthenticated,
   });
@@ -93,33 +96,56 @@ export default function Products() {
                 <Filter className="w-5 h-5 mr-2" />
                 Filters
               </CardTitle>
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-600">View:</span>
-                <div className="flex rounded-lg border border-gray-200 overflow-hidden">
-                  <Button
-                    variant={viewMode === "cards" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("cards")}
-                    className="rounded-none border-0"
-                  >
-                    <LayoutGrid className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === "list" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("list")}
-                    className="rounded-none border-0 border-l"
-                  >
-                    <List className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === "grid" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("grid")}
-                    className="rounded-none border-0 border-l"
-                  >
-                    <Grid3X3 className="w-4 h-4" />
-                  </Button>
+              <div className="flex items-center space-x-4">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={async () => {
+                    if (confirm('Are you sure you want to delete ALL products? This action cannot be undone.')) {
+                      try {
+                        const response = await fetch('/api/products', { method: 'DELETE' });
+                        if (response.ok) {
+                          refetchProducts();
+                          toast({ title: 'Success', description: 'All products deleted successfully' });
+                        }
+                      } catch (error) {
+                        toast({ title: 'Error', description: 'Failed to delete products', variant: 'destructive' });
+                      }
+                    }
+                  }}
+                >
+                  <Trash className="w-4 h-4 mr-2" />
+                  Delete All
+                </Button>
+                
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">View:</span>
+                  <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                    <Button
+                      variant={viewMode === "cards" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("cards")}
+                      className="rounded-none border-0"
+                    >
+                      <LayoutGrid className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant={viewMode === "list" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("list")}
+                      className="rounded-none border-0 border-l"
+                    >
+                      <List className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant={viewMode === "grid" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("grid")}
+                      className="rounded-none border-0 border-l"
+                    >
+                      <Grid3X3 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

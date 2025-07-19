@@ -13,6 +13,8 @@ VendorSync Pro is a comprehensive vendor management platform for Shopify that co
 - Fixed sync system to pull only vendor-specific products (filtered by vendor name)
 - Added advanced product filtering by brand, status (active/archived/draft)
 - Implemented multiple view modes (cards, list, grid) for product management
+- Added "Delete All Products" functionality for easy data cleanup and re-sync
+- Created vendor-specific product deletion endpoints for targeted cleanup
 
 ## User Preferences
 

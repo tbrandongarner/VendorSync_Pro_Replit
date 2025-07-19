@@ -189,6 +189,14 @@ export class DatabaseStorage implements IStorage {
     await db.delete(products).where(eq(products.id, id));
   }
 
+  async deleteAllProducts(): Promise<void> {
+    await db.delete(products);
+  }
+
+  async deleteVendorProducts(vendorId: number): Promise<void> {
+    await db.delete(products).where(eq(products.vendorId, vendorId));
+  }
+
   // Sync job operations
   async getSyncJobs(vendorId?: number): Promise<SyncJob[]> {
     let query = db.select().from(syncJobs);
