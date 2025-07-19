@@ -124,7 +124,10 @@ export class ShopifyService {
     if (!store.shopifyAccessToken) {
       throw new Error('Shopify access token is required');
     }
-    this.baseUrl = `https://${store.shopifyStoreUrl}/admin/api/${this.apiVersion}`;
+    
+    // Normalize the store URL - remove protocol if present, then add https://
+    const normalizedUrl = store.shopifyStoreUrl.replace(/^https?:\/\//, '');
+    this.baseUrl = `https://${normalizedUrl}/admin/api/${this.apiVersion}`;
     this.accessToken = store.shopifyAccessToken;
   }
 
