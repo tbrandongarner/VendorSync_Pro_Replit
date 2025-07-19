@@ -591,7 +591,7 @@ export class ProductSyncService {
 
           if (shopifyMatch) {
             // Product exists in Shopify - update it
-            const shopifyProductData = this.convertVendorToShopifyProduct(vendorProduct);
+            const shopifyProductData = this.convertVendorToShopifyProduct(vendorProduct, vendor.name);
             
             if (options.syncPricing && vendorProduct.price) {
               shopifyProductData.variants[0].price = vendorProduct.price.toString();
@@ -615,6 +615,8 @@ export class ProductSyncService {
               barcode: vendorProduct.barcode || null,
               inventory: vendorProduct.inventory || 0,
               category: vendorProduct.category || null,
+              brand: vendor.name, // Set vendor name as brand
+              status: 'active',
               images: vendorProduct.images ? JSON.stringify(vendorProduct.images) : null,
               isActive: true,
               lastSyncAt: new Date(),
@@ -630,7 +632,7 @@ export class ProductSyncService {
           } else {
             // Product doesn't exist in Shopify - create it if pushing
             if (options.direction === 'push' || options.direction === 'bidirectional') {
-              const shopifyProductData = this.convertVendorToShopifyProduct(vendorProduct);
+              const shopifyProductData = this.convertVendorToShopifyProduct(vendorProduct, vendor.name);
               const newShopifyProduct = await this.shopifyService.createProduct(shopifyProductData);
 
               // Create database record
@@ -646,6 +648,8 @@ export class ProductSyncService {
                 barcode: vendorProduct.barcode || null,
                 inventory: vendorProduct.inventory || 0,
                 category: vendorProduct.category || null,
+                brand: vendor.name, // Set vendor name as brand
+                status: 'active',
                 images: vendorProduct.images ? JSON.stringify(vendorProduct.images) : null,
                 isActive: true,
                 lastSyncAt: new Date(),
@@ -688,12 +692,12 @@ export class ProductSyncService {
     return products.find(p => p.sku === sku) || null;
   }
 
-  private convertVendorToShopifyProduct(vendorProduct: ParsedProduct): any {
+  private convertVendorToShopifyProduct(vendorProduct: ParsedProduct, vendorName?: string): any {
     return {
       title: vendorProduct.name,
       body_html: vendorProduct.description || '',
       product_type: vendorProduct.category || '',
-      vendor: '', // This could be set from vendor name
+      vendor: vendorName || '', // Set vendor name
       tags: [],
       variants: [{
         sku: vendorProduct.sku,

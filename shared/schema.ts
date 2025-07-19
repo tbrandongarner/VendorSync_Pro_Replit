@@ -86,6 +86,8 @@ export const products = pgTable("products", {
   barcode: varchar("barcode"),
   inventory: integer("inventory").default(0),
   category: varchar("category"),
+  brand: varchar("brand"), // Brand/vendor name for filtering
+  status: varchar("status").default("active"), // active, archived, draft
   tags: jsonb("tags"),
   images: jsonb("images"),
   variants: jsonb("variants"),
