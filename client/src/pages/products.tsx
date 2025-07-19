@@ -12,8 +12,8 @@ import { Search, Box, Filter, ExternalLink } from "lucide-react";
 export default function Products() {
   const { isAuthenticated } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedVendor, setSelectedVendor] = useState<string>("");
-  const [selectedStore, setSelectedStore] = useState<string>("");
+  const [selectedVendor, setSelectedVendor] = useState<string>("all");
+  const [selectedStore, setSelectedStore] = useState<string>("all");
 
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ["/api/products"],
@@ -33,8 +33,8 @@ export default function Products() {
   const filteredProducts = products.filter((product: any) => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.sku?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesVendor = !selectedVendor || product.vendorId.toString() === selectedVendor;
-    const matchesStore = !selectedStore || product.storeId.toString() === selectedStore;
+    const matchesVendor = selectedVendor === "all" || product.vendorId.toString() === selectedVendor;
+    const matchesStore = selectedStore === "all" || product.storeId.toString() === selectedStore;
     
     return matchesSearch && matchesVendor && matchesStore;
   });
@@ -90,7 +90,7 @@ export default function Products() {
                   <SelectValue placeholder="All Vendors" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Vendors</SelectItem>
+                  <SelectItem value="all">All Vendors</SelectItem>
                   {vendors.map((vendor: any) => (
                     <SelectItem key={vendor.id} value={vendor.id.toString()}>
                       {vendor.name}
@@ -104,7 +104,7 @@ export default function Products() {
                   <SelectValue placeholder="All Stores" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Stores</SelectItem>
+                  <SelectItem value="all">All Stores</SelectItem>
                   {stores.map((store: any) => (
                     <SelectItem key={store.id} value={store.id.toString()}>
                       {store.name}
@@ -117,8 +117,8 @@ export default function Products() {
                 variant="outline" 
                 onClick={() => {
                   setSearchTerm("");
-                  setSelectedVendor("");
-                  setSelectedStore("");
+                  setSelectedVendor("all");
+                  setSelectedStore("all");
                 }}
               >
                 Clear Filters
@@ -152,10 +152,10 @@ export default function Products() {
             <CardContent className="text-center py-16">
               <Box className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {searchTerm || selectedVendor || selectedStore ? 'No products found' : 'No products synced yet'}
+                {searchTerm || (selectedVendor !== "all") || (selectedStore !== "all") ? 'No products found' : 'No products synced yet'}
               </h3>
               <p className="text-gray-600">
-                {searchTerm || selectedVendor || selectedStore
+                {searchTerm || (selectedVendor !== "all") || (selectedStore !== "all")
                   ? 'Try adjusting your filters or search terms'
                   : 'Products will appear here once vendors start syncing their catalogs'
                 }
