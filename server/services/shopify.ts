@@ -163,10 +163,28 @@ export class ShopifyService {
       endpoint += `&page_info=${pageInfo}`;
     }
 
-    const response = await this.makeRequest<{ products: ShopifyProduct[] }>(endpoint);
+    const url = `${this.baseUrl}${endpoint}`;
+    const response = await fetch(url, {
+      headers: {
+        'X-Shopify-Access-Token': this.accessToken,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Shopify API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    // Extract page info from Link header
+    const linkHeader = response.headers.get('link');
+    const nextPageInfo = this.extractPageInfoFromHeader(linkHeader);
+
     return {
-      products: response.products,
-      pageInfo: this.extractPageInfo(endpoint),
+      products: data.products,
+      pageInfo: nextPageInfo,
     };
   }
 
@@ -336,10 +354,12 @@ export class ShopifyService {
   }
 
   // Utility methods
-  private extractPageInfo(endpoint: string): string | undefined {
-    // In a real implementation, extract page info from Link header
-    // For now, return undefined as we're using basic pagination
-    return undefined;
+  private extractPageInfoFromHeader(linkHeader: string | null): string | undefined {
+    if (!linkHeader) return undefined;
+    
+    // Parse Link header to extract page_info for next page
+    const nextMatch = linkHeader.match(/<[^>]*[?&]page_info=([^&>]+)[^>]*>;\s*rel="next"/);
+    return nextMatch ? nextMatch[1] : undefined;
   }
 
   // Convert internal product to Shopify format

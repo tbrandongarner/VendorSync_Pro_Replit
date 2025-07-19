@@ -212,6 +212,8 @@ export const insertVendorSchema = createInsertSchema(vendors).omit({
   createdAt: true,
   updatedAt: true,
   lastSyncAt: true,
+}).extend({
+  commissionRate: z.union([z.string(), z.number()]).transform(val => String(val)).optional(),
 });
 
 export const insertProductSchema = createInsertSchema(products).omit({

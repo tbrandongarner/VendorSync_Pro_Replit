@@ -4,7 +4,12 @@
 
 VendorSync Pro is a comprehensive vendor management platform for Shopify that combines modern web technologies with AI-powered content generation and real-time synchronization capabilities. The application is built as a full-stack TypeScript solution with React frontend and Express backend.
 
-**Latest Update (January 2025):** Complete Shopify API integration implemented with full two-way product synchronization, real-time WebSocket updates, and comprehensive product management capabilities.
+**Latest Update (July 2025):** 
+- Fixed Shopify connection issues with URL normalization
+- Resolved Select component validation errors
+- Improved pagination handling for product syncing
+- Fixed vendor creation form validation for commission rates
+- Application now fully functional for Shopify product synchronization
 
 ## User Preferences
 
