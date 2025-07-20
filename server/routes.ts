@@ -1,5 +1,9 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { generateProductContent, generateProductDescription } from "./services/openai";
@@ -16,6 +20,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth middleware
   await setupAuth(app);
+
+  // Configure multer for file uploads
+  const uploadsDir = path.join(process.cwd(), 'uploads', 'logos');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  const logoStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadsDir);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const ext = path.extname(file.originalname);
+      cb(null, `vendor-logo-${uniqueSuffix}${ext}`);
+    }
+  });
+
+  const uploadLogo = multer({
+    storage: logoStorage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = /jpeg|jpg|png|gif|webp/;
+      const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+      const mimetype = allowedTypes.test(file.mimetype);
+      
+      if (mimetype && extname) {
+        return cb(null, true);
+      } else {
+        cb(new Error('Only image files (jpeg, jpg, png, gif, webp) are allowed'));
+      }
+    }
+  });
+
+  // Serve uploaded logo files
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+  // Logo upload endpoint
+  app.post('/api/upload/logo', isAuthenticated, uploadLogo.single('logo'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+      
+      const logoUrl = `/uploads/logos/${req.file.filename}`;
+      res.json({ logoUrl });
+    } catch (error) {
+      console.error('Logo upload error:', error);
+      res.status(500).json({ message: 'Failed to upload logo' });
+    }
+  });
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {

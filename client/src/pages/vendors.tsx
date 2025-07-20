@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Users, Mail, Globe, MoreHorizontal } from "lucide-react";
+import { Plus, Search, Users, Mail, Globe, MoreHorizontal, Phone, User } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -187,9 +187,26 @@ export default function Vendors() {
                       )}
                       <div className="flex-1 min-w-0">
                         <CardTitle className="text-lg truncate">{vendor.name}</CardTitle>
-                        <CardDescription className="flex items-center">
-                          <Mail className="w-3 h-3 mr-1" />
-                          {vendor.contactEmail}
+                        <CardDescription className="space-y-1">
+                          <div className="flex items-center">
+                            <Mail className="w-3 h-3 mr-1" />
+                            {vendor.contactEmail}
+                          </div>
+                          {vendor.phone && (
+                            <div className="flex items-center">
+                              <Phone className="w-3 h-3 mr-1" />
+                              {vendor.phone}
+                            </div>
+                          )}
+                          {vendor.website && (
+                            <div className="flex items-center">
+                              <Globe className="w-3 h-3 mr-1" />
+                              <a href={vendor.website} target="_blank" rel="noopener noreferrer" 
+                                 className="text-blue-600 hover:underline text-xs truncate">
+                                {vendor.website}
+                              </a>
+                            </div>
+                          )}
                         </CardDescription>
                       </div>
                     </div>
@@ -246,6 +263,31 @@ export default function Vendors() {
                     {vendor.lastSyncAt && (
                       <div className="text-xs text-gray-500">
                         Last sync: {new Date(vendor.lastSyncAt).toLocaleDateString()}
+                      </div>
+                    )}
+
+                    {/* Secondary Contact */}
+                    {(vendor.secondaryContactName || vendor.secondaryContactEmail || vendor.secondaryContactPhone) && (
+                      <div className="pt-2 border-t">
+                        <div className="text-xs font-medium text-gray-800 mb-1 flex items-center">
+                          <User className="w-3 h-3 mr-1" />
+                          Secondary Contact
+                        </div>
+                        {vendor.secondaryContactName && (
+                          <div className="text-xs text-gray-600">{vendor.secondaryContactName}</div>
+                        )}
+                        {vendor.secondaryContactEmail && (
+                          <div className="text-xs text-gray-600 flex items-center">
+                            <Mail className="w-3 h-3 mr-1" />
+                            {vendor.secondaryContactEmail}
+                          </div>
+                        )}
+                        {vendor.secondaryContactPhone && (
+                          <div className="text-xs text-gray-600 flex items-center">
+                            <Phone className="w-3 h-3 mr-1" />
+                            {vendor.secondaryContactPhone}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

@@ -60,7 +60,14 @@ export const vendors = pgTable("vendors", {
   userId: varchar("user_id").notNull().references(() => users.id),
   name: varchar("name").notNull(),
   contactEmail: varchar("contact_email").notNull(),
+  phone: varchar("phone"),
+  website: varchar("website"),
   logoUrl: varchar("logo_url"),
+  // Secondary contact information
+  secondaryContactName: varchar("secondary_contact_name"),
+  secondaryContactEmail: varchar("secondary_contact_email"),
+  secondaryContactPhone: varchar("secondary_contact_phone"),
+  // Business information
   commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }),
   syncFrequency: varchar("sync_frequency").default("daily"), // hourly, daily, weekly, manual
   dataSourceType: varchar("data_source_type").default("csv_upload"), // csv_upload, excel_upload, google_sheets, api
@@ -223,6 +230,11 @@ export const insertVendorSchema = createInsertSchema(vendors).omit({
   lastSyncAt: true,
 }).extend({
   commissionRate: z.union([z.string(), z.number()]).transform(val => String(val)).optional(),
+  phone: z.string().optional(),
+  website: z.string().url().optional().or(z.literal('')),
+  secondaryContactName: z.string().optional(),
+  secondaryContactEmail: z.string().email().optional().or(z.literal('')),
+  secondaryContactPhone: z.string().optional(),
 });
 
 export const insertProductSchema = createInsertSchema(products).omit({

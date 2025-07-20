@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Save, X } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Upload, Save, X, User, Phone, Mail, Globe, Camera } from "lucide-react";
 import FileUpload from "@/components/ui/file-upload";
 
 interface VendorModalProps {
@@ -20,10 +21,18 @@ interface VendorModalProps {
 
 export default function VendorModal({ isOpen, onClose, vendor }: VendorModalProps) {
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
   const [formData, setFormData] = useState({
     name: "",
     contactEmail: "",
+    phone: "",
+    website: "",
     logoUrl: "",
+    secondaryContactName: "",
+    secondaryContactEmail: "",
+    secondaryContactPhone: "",
     commissionRate: "",
     syncFrequency: "daily",
     dataSourceType: "csv_upload",
@@ -38,7 +47,12 @@ export default function VendorModal({ isOpen, onClose, vendor }: VendorModalProp
       setFormData({
         name: vendor.name || "",
         contactEmail: vendor.contactEmail || "",
+        phone: vendor.phone || "",
+        website: vendor.website || "",
         logoUrl: vendor.logoUrl || "",
+        secondaryContactName: vendor.secondaryContactName || "",
+        secondaryContactEmail: vendor.secondaryContactEmail || "",
+        secondaryContactPhone: vendor.secondaryContactPhone || "",
         commissionRate: vendor.commissionRate || "",
         syncFrequency: vendor.syncFrequency || "daily",
         dataSourceType: vendor.dataSourceType || "csv_upload",
@@ -50,7 +64,12 @@ export default function VendorModal({ isOpen, onClose, vendor }: VendorModalProp
       setFormData({
         name: "",
         contactEmail: "",
+        phone: "",
+        website: "",
         logoUrl: "",
+        secondaryContactName: "",
+        secondaryContactEmail: "",
+        secondaryContactPhone: "",
         commissionRate: "",
         syncFrequency: "daily",
         dataSourceType: "csv_upload",
@@ -152,6 +171,36 @@ export default function VendorModal({ isOpen, onClose, vendor }: VendorModalProp
     }
   };
 
+  const handleLogoUpload = async (file: File) => {
+    setIsUploading(true);
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append('logo', file);
+      
+      const response = await apiRequest("POST", "/api/upload/logo", uploadFormData);
+      const { logoUrl } = await response.json();
+      
+      setFormData(prev => ({ ...prev, logoUrl }));
+      toast({
+        title: "Success",
+        description: "Logo uploaded successfully",
+      });
+    } catch (error) {
+      console.error("Logo upload failed:", error);
+      toast({
+        title: "Error",
+        description: "Failed to upload logo",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
+  };
+
   const isPending = createVendorMutation.isPending || updateVendorMutation.isPending;
 
   return (
@@ -192,19 +241,124 @@ export default function VendorModal({ isOpen, onClose, vendor }: VendorModalProp
             </div>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="logoUrl">Company Logo URL</Label>
-            <Input
-              id="logoUrl"
-              type="url"
-              placeholder="https://example.com/logo.png"
-              value={formData.logoUrl}
-              onChange={(e) => setFormData(prev => ({ ...prev, logoUrl: e.target.value }))}
-            />
-            <p className="text-xs text-gray-500">
-              URL to vendor's logo image (PNG, JPG, or SVG)
-            </p>
+          {/* Contact Information */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="phone">
+                <Phone className="w-4 h-4 inline mr-2" />
+                Phone Number
+              </Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="+1 (555) 123-4567"
+                value={formData.phone}
+                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="website">
+                <Globe className="w-4 h-4 inline mr-2" />
+                Website
+              </Label>
+              <Input
+                id="website"
+                type="url"
+                placeholder="https://company.com"
+                value={formData.website}
+                onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
+              />
+            </div>
           </div>
+
+          {/* Logo Upload */}
+          <div className="space-y-2">
+            <Label>
+              <Camera className="w-4 h-4 inline mr-2" />
+              Company Logo
+            </Label>
+            <div className="flex items-center space-x-4">
+              {formData.logoUrl && (
+                <img 
+                  src={formData.logoUrl} 
+                  alt="Vendor logo preview" 
+                  className="w-16 h-16 object-contain rounded border"
+                />
+              )}
+              <div className="flex-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleLogoUpload(file);
+                  }}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={triggerFileUpload}
+                  disabled={isUploading}
+                  className="w-full"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  {isUploading ? "Uploading..." : "Upload Logo"}
+                </Button>
+                <p className="text-xs text-gray-500 mt-1">
+                  PNG, JPG, GIF, or WebP (max 5MB)
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Secondary Contact */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-900 flex items-center">
+              <User className="w-4 h-4 mr-2" />
+              Secondary Contact (Optional)
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="secondaryContactName">Name</Label>
+                <Input
+                  id="secondaryContactName"
+                  placeholder="John Smith"
+                  value={formData.secondaryContactName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, secondaryContactName: e.target.value }))}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="secondaryContactEmail">Email</Label>
+                <Input
+                  id="secondaryContactEmail"
+                  type="email"
+                  placeholder="john@company.com"
+                  value={formData.secondaryContactEmail}
+                  onChange={(e) => setFormData(prev => ({ ...prev, secondaryContactEmail: e.target.value }))}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="secondaryContactPhone">Phone</Label>
+                <Input
+                  id="secondaryContactPhone"
+                  type="tel"
+                  placeholder="+1 (555) 987-6543"
+                  value={formData.secondaryContactPhone}
+                  onChange={(e) => setFormData(prev => ({ ...prev, secondaryContactPhone: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
