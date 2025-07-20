@@ -25,6 +25,11 @@ VendorSync Pro is a comprehensive vendor management platform for Shopify that co
 - Implemented change detection system that automatically marks products for re-sync
 - Added "Sync Changes" button to process modified products
 - System now tracks local modifications vs. Shopify data for targeted sync operations
+- **COMPLETE (July 20, 2025):** Enhanced vendor management with file uploads and extended contact info
+- Added logo upload functionality with multer integration and image preview
+- Created additional vendor contact fields (phone, website, secondary contact)
+- Updated vendor cards to display logos and comprehensive contact information
+- Fixed FormData handling for proper file upload functionality
 
 ## User Preferences
 

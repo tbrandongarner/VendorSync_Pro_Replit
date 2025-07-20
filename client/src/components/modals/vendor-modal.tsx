@@ -177,7 +177,17 @@ export default function VendorModal({ isOpen, onClose, vendor }: VendorModalProp
       const uploadFormData = new FormData();
       uploadFormData.append('logo', file);
       
-      const response = await apiRequest("POST", "/api/upload/logo", uploadFormData);
+      // Use direct fetch instead of apiRequest to properly handle FormData
+      const response = await fetch("/api/upload/logo", {
+        method: "POST",
+        body: uploadFormData,
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
+      }
+      
       const { logoUrl } = await response.json();
       
       setFormData(prev => ({ ...prev, logoUrl }));
