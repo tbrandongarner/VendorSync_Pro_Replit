@@ -126,9 +126,14 @@ export class ProductSyncService {
     try {
       let pageInfo: string | undefined;
       let hasMore = true;
+      let pageCount = 0;
       const batchSize = options.batchSize || 50;
+      const maxPages = Math.ceil(1000 / batchSize); // Limit to ~1000 products for initial test
 
-      while (hasMore) {
+      while (hasMore && pageCount < maxPages) {
+        pageCount++;
+        console.log(`Fetching page ${pageCount}, limit: ${batchSize}${pageInfo ? `, pageInfo: ${pageInfo.substring(0, 20)}...` : ''}`);
+        
         const response = await this.shopifyService.getProducts(batchSize, pageInfo);
         let shopifyProducts = response.products;
 
@@ -234,7 +239,9 @@ export class ProductSyncService {
         }
 
         pageInfo = response.pageInfo;
-        hasMore = !!pageInfo && shopifyProducts.length === batchSize;
+        hasMore = !!pageInfo && shopifyProducts.length > 0;
+        
+        console.log(`Completed page ${pageCount}: found ${originalCount} total, ${shopifyProducts.length} matched vendor`);
       }
     } catch (error) {
       result.success = false;
