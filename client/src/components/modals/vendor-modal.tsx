@@ -302,11 +302,13 @@ export default function VendorModal({ isOpen, onClose, vendor }: VendorModalProp
             </Label>
             <div className="flex items-center space-x-4">
               {formData.logoUrl && (
-                <img 
-                  src={formData.logoUrl} 
-                  alt="Vendor logo preview" 
-                  className="w-16 h-16 object-contain rounded border"
-                />
+                <div className="w-16 h-16 bg-gray-50 rounded border overflow-hidden flex items-center justify-center">
+                  <img 
+                    src={formData.logoUrl} 
+                    alt="Vendor logo preview" 
+                    className="max-w-full max-h-full object-contain"
+                  />
+                </div>
               )}
               <div className="flex-1">
                 <input

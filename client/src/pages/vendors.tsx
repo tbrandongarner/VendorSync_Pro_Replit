@@ -175,11 +175,13 @@ export default function Vendors() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       {vendor.logoUrl ? (
-                        <img
-                          src={vendor.logoUrl}
-                          alt={vendor.name}
-                          className="w-12 h-12 rounded-lg object-cover"
-                        />
+                        <div className="w-12 h-12 bg-gray-50 rounded-lg border overflow-hidden flex items-center justify-center">
+                          <img
+                            src={vendor.logoUrl}
+                            alt={vendor.name}
+                            className="max-w-full max-h-full object-contain"
+                          />
+                        </div>
                       ) : (
                         <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
                           <Users className="w-6 h-6 text-emerald-600" />
