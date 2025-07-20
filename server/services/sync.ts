@@ -242,9 +242,9 @@ export class ProductSyncService {
         }
 
         pageInfo = response.pageInfo;
-        hasMore = (!!pageInfo || shopifyProducts.length === batchSize) && shopifyProducts.length > 0;
+        hasMore = !!pageInfo && originalCount > 0;
         
-        console.log(`Completed page ${pageCount}: found ${originalCount} total, ${shopifyProducts.length} matched vendor. Next page: ${hasMore ? 'Yes' : 'No'}`);
+        console.log(`Completed page ${pageCount}: found ${originalCount} total, ${shopifyProducts.length} matched vendor. PageInfo: ${pageInfo ? 'Available' : 'None'}, Next page: ${hasMore ? 'Yes' : 'No'}`);
       }
     } catch (error) {
       result.success = false;
