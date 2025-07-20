@@ -137,13 +137,16 @@ export class ProductSyncService {
         const response = await this.shopifyService.getProducts(batchSize, pageInfo);
         let shopifyProducts = response.products;
 
-        // DEBUG: Temporarily disable filtering to see all products
-        console.log(`Found ${shopifyProducts.length} products in Shopify store`);
+        console.log(`Found ${shopifyProducts.length} products in Shopify store. PageInfo for next: ${response.pageInfo ? 'Yes' : 'No'}`);
         if (shopifyProducts.length > 0) {
           console.log('First product sample:', {
             title: shopifyProducts[0].title,
             vendor: shopifyProducts[0].vendor,
             tags: shopifyProducts[0].tags
+          });
+          console.log('Last product sample:', {
+            title: shopifyProducts[shopifyProducts.length - 1].title,
+            vendor: shopifyProducts[shopifyProducts.length - 1].vendor
           });
         }
         
@@ -239,9 +242,9 @@ export class ProductSyncService {
         }
 
         pageInfo = response.pageInfo;
-        hasMore = !!pageInfo && shopifyProducts.length > 0;
+        hasMore = (!!pageInfo || shopifyProducts.length === batchSize) && shopifyProducts.length > 0;
         
-        console.log(`Completed page ${pageCount}: found ${originalCount} total, ${shopifyProducts.length} matched vendor`);
+        console.log(`Completed page ${pageCount}: found ${originalCount} total, ${shopifyProducts.length} matched vendor. Next page: ${hasMore ? 'Yes' : 'No'}`);
       }
     } catch (error) {
       result.success = false;
