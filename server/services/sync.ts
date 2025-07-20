@@ -132,38 +132,52 @@ export class ProductSyncService {
         const response = await this.shopifyService.getProducts(batchSize, pageInfo);
         let shopifyProducts = response.products;
 
-        // Filter products that match this vendor
-        // Include products where vendor field matches our vendor name or products with no vendor set
+        // DEBUG: Temporarily disable filtering to see all products
+        console.log(`Found ${shopifyProducts.length} products in Shopify store`);
+        if (shopifyProducts.length > 0) {
+          console.log('First product sample:', {
+            title: shopifyProducts[0].title,
+            vendor: shopifyProducts[0].vendor,
+            tags: shopifyProducts[0].tags
+          });
+        }
+        
+        // Filter products that match this vendor with more flexible matching
+        const originalCount = shopifyProducts.length;
         shopifyProducts = shopifyProducts.filter(product => {
           // Check if product vendor matches our vendor name (case insensitive)
-          if (product.vendor && product.vendor.toLowerCase() === vendor.name.toLowerCase()) {
+          if (product.vendor && product.vendor.toLowerCase().includes(vendor.name.toLowerCase())) {
             return true;
           }
           
-          // For products with no vendor set, check if they might belong to this vendor
-          // by looking at product title, tags, or other identifiers
-          if (!product.vendor) {
-            const productTitle = product.title.toLowerCase();
-            const vendorName = vendor.name.toLowerCase();
-            
-            // Check if vendor name appears in product title
-            if (productTitle.includes(vendorName)) {
-              return true;
+          // Check if vendor name appears in product title
+          const productTitle = product.title.toLowerCase();
+          const vendorName = vendor.name.toLowerCase();
+          if (productTitle.includes(vendorName)) {
+            return true;
+          }
+          
+          // Check tags for vendor name (handle both string and array formats)
+          if (product.tags) {
+            let tagsArray: string[] = [];
+            if (typeof product.tags === 'string') {
+              tagsArray = product.tags.split(',').map(tag => tag.trim());
+            } else if (Array.isArray(product.tags)) {
+              tagsArray = product.tags;
             }
             
-            // Check tags for vendor name
-            if (product.tags && Array.isArray(product.tags)) {
-              const hasVendorTag = product.tags.some(tag => 
-                tag.toLowerCase().includes(vendorName)
-              );
-              if (hasVendorTag) {
-                return true;
-              }
+            const hasVendorTag = tagsArray.some(tag => 
+              tag.toLowerCase().includes(vendorName)
+            );
+            if (hasVendorTag) {
+              return true;
             }
           }
           
           return false;
         });
+        
+        console.log(`Filtered from ${originalCount} to ${shopifyProducts.length} products for vendor: ${vendor.name}`);
 
         await storage.updateSyncJob(syncJobId, {
           totalItems: result.totalProcessed + shopifyProducts.length,

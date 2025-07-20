@@ -80,8 +80,8 @@ export const products = pgTable("products", {
   shopifyProductId: varchar("shopify_product_id"),
   name: varchar("name").notNull(),
   description: text("description"),
-  price: decimal("price", { precision: 10, scale: 2 }),
-  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
+  price: decimal("price", { precision: 15, scale: 2 }),
+  compareAtPrice: decimal("compare_at_price", { precision: 15, scale: 2 }),
   sku: varchar("sku").notNull(), // SKU is now primary identifier
   barcode: varchar("barcode"),
   inventory: integer("inventory").default(0),
