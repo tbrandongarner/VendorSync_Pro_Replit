@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Users, Mail, Globe, MoreHorizontal, Phone, User } from "lucide-react";
+import { Plus, Search, Users, Mail, Globe, MoreHorizontal, Phone, User, Headphones, DollarSign } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -266,26 +266,76 @@ export default function Vendors() {
                       </div>
                     )}
 
-                    {/* Secondary Contact */}
-                    {(vendor.secondaryContactName || vendor.secondaryContactEmail || vendor.secondaryContactPhone) && (
-                      <div className="pt-2 border-t">
-                        <div className="text-xs font-medium text-gray-800 mb-1 flex items-center">
-                          <User className="w-3 h-3 mr-1" />
-                          Secondary Contact
-                        </div>
-                        {vendor.secondaryContactName && (
-                          <div className="text-xs text-gray-600">{vendor.secondaryContactName}</div>
-                        )}
-                        {vendor.secondaryContactEmail && (
-                          <div className="text-xs text-gray-600 flex items-center">
-                            <Mail className="w-3 h-3 mr-1" />
-                            {vendor.secondaryContactEmail}
+                    {/* Additional Contacts */}
+                    {(vendor.secondaryContactName || vendor.secondaryContactEmail || vendor.secondaryContactPhone || 
+                      vendor.supportEmail || vendor.supportPhone || vendor.salesEmail || vendor.salesPhone) && (
+                      <div className="pt-2 border-t space-y-2">
+                        {/* Secondary Contact */}
+                        {(vendor.secondaryContactName || vendor.secondaryContactEmail || vendor.secondaryContactPhone) && (
+                          <div>
+                            <div className="text-xs font-medium text-gray-800 mb-1 flex items-center">
+                              <User className="w-3 h-3 mr-1" />
+                              Secondary Contact
+                            </div>
+                            {vendor.secondaryContactName && (
+                              <div className="text-xs text-gray-600">{vendor.secondaryContactName}</div>
+                            )}
+                            {vendor.secondaryContactEmail && (
+                              <div className="text-xs text-gray-600 flex items-center">
+                                <Mail className="w-3 h-3 mr-1" />
+                                {vendor.secondaryContactEmail}
+                              </div>
+                            )}
+                            {vendor.secondaryContactPhone && (
+                              <div className="text-xs text-gray-600 flex items-center">
+                                <Phone className="w-3 h-3 mr-1" />
+                                {vendor.secondaryContactPhone}
+                              </div>
+                            )}
                           </div>
                         )}
-                        {vendor.secondaryContactPhone && (
-                          <div className="text-xs text-gray-600 flex items-center">
-                            <Phone className="w-3 h-3 mr-1" />
-                            {vendor.secondaryContactPhone}
+
+                        {/* Support Contact */}
+                        {(vendor.supportEmail || vendor.supportPhone) && (
+                          <div>
+                            <div className="text-xs font-medium text-gray-800 mb-1 flex items-center">
+                              <Headphones className="w-3 h-3 mr-1" />
+                              Support
+                            </div>
+                            {vendor.supportEmail && (
+                              <div className="text-xs text-gray-600 flex items-center">
+                                <Mail className="w-3 h-3 mr-1" />
+                                {vendor.supportEmail}
+                              </div>
+                            )}
+                            {vendor.supportPhone && (
+                              <div className="text-xs text-gray-600 flex items-center">
+                                <Phone className="w-3 h-3 mr-1" />
+                                {vendor.supportPhone}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Sales Contact */}
+                        {(vendor.salesEmail || vendor.salesPhone) && (
+                          <div>
+                            <div className="text-xs font-medium text-gray-800 mb-1 flex items-center">
+                              <DollarSign className="w-3 h-3 mr-1" />
+                              Sales
+                            </div>
+                            {vendor.salesEmail && (
+                              <div className="text-xs text-gray-600 flex items-center">
+                                <Mail className="w-3 h-3 mr-1" />
+                                {vendor.salesEmail}
+                              </div>
+                            )}
+                            {vendor.salesPhone && (
+                              <div className="text-xs text-gray-600 flex items-center">
+                                <Phone className="w-3 h-3 mr-1" />
+                                {vendor.salesPhone}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Upload, Save, X, User, Phone, Mail, Globe, Camera } from "lucide-react";
+import { Upload, Save, X, User, Phone, Mail, Globe, Camera, Headphones, DollarSign } from "lucide-react";
 import FileUpload from "@/components/ui/file-upload";
 
 interface VendorModalProps {
@@ -33,6 +33,10 @@ export default function VendorModal({ isOpen, onClose, vendor }: VendorModalProp
     secondaryContactName: "",
     secondaryContactEmail: "",
     secondaryContactPhone: "",
+    supportEmail: "",
+    supportPhone: "",
+    salesEmail: "",
+    salesPhone: "",
     commissionRate: "",
     syncFrequency: "daily",
     dataSourceType: "csv_upload",
@@ -53,6 +57,10 @@ export default function VendorModal({ isOpen, onClose, vendor }: VendorModalProp
         secondaryContactName: vendor.secondaryContactName || "",
         secondaryContactEmail: vendor.secondaryContactEmail || "",
         secondaryContactPhone: vendor.secondaryContactPhone || "",
+        supportEmail: vendor.supportEmail || "",
+        supportPhone: vendor.supportPhone || "",
+        salesEmail: vendor.salesEmail || "",
+        salesPhone: vendor.salesPhone || "",
         commissionRate: vendor.commissionRate || "",
         syncFrequency: vendor.syncFrequency || "daily",
         dataSourceType: vendor.dataSourceType || "csv_upload",
@@ -70,6 +78,10 @@ export default function VendorModal({ isOpen, onClose, vendor }: VendorModalProp
         secondaryContactName: "",
         secondaryContactEmail: "",
         secondaryContactPhone: "",
+        supportEmail: "",
+        supportPhone: "",
+        salesEmail: "",
+        salesPhone: "",
         commissionRate: "",
         syncFrequency: "daily",
         dataSourceType: "csv_upload",
@@ -363,6 +375,74 @@ export default function VendorModal({ isOpen, onClose, vendor }: VendorModalProp
                   placeholder="+1 (555) 987-6543"
                   value={formData.secondaryContactPhone}
                   onChange={(e) => setFormData(prev => ({ ...prev, secondaryContactPhone: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Support Contact */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-900 flex items-center">
+              <Headphones className="w-4 h-4 mr-2" />
+              Support Contact (Optional)
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="supportEmail">Support Email</Label>
+                <Input
+                  id="supportEmail"
+                  type="email"
+                  placeholder="support@company.com"
+                  value={formData.supportEmail}
+                  onChange={(e) => setFormData(prev => ({ ...prev, supportEmail: e.target.value }))}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="supportPhone">Support Phone</Label>
+                <Input
+                  id="supportPhone"
+                  type="tel"
+                  placeholder="+1 (555) 123-HELP"
+                  value={formData.supportPhone}
+                  onChange={(e) => setFormData(prev => ({ ...prev, supportPhone: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Sales Contact */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-gray-900 flex items-center">
+              <DollarSign className="w-4 h-4 mr-2" />
+              Sales Contact (Optional)
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="salesEmail">Sales Email</Label>
+                <Input
+                  id="salesEmail"
+                  type="email"
+                  placeholder="sales@company.com"
+                  value={formData.salesEmail}
+                  onChange={(e) => setFormData(prev => ({ ...prev, salesEmail: e.target.value }))}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="salesPhone">Sales Phone</Label>
+                <Input
+                  id="salesPhone"
+                  type="tel"
+                  placeholder="+1 (555) 123-SALE"
+                  value={formData.salesPhone}
+                  onChange={(e) => setFormData(prev => ({ ...prev, salesPhone: e.target.value }))}
                 />
               </div>
             </div>

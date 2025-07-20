@@ -30,6 +30,11 @@ VendorSync Pro is a comprehensive vendor management platform for Shopify that co
 - Created additional vendor contact fields (phone, website, secondary contact)
 - Updated vendor cards to display logos and comprehensive contact information
 - Fixed FormData handling for proper file upload functionality
+- **COMPLETE (July 20, 2025):** Added comprehensive department contact management
+- Created support contact fields (email and phone) for customer service
+- Added sales contact fields (email and phone) for business development
+- Enhanced vendor cards to display all contact departments with appropriate icons
+- Organized contact information in clear, categorized sections
 
 ## User Preferences
 

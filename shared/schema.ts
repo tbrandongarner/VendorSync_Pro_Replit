@@ -67,6 +67,12 @@ export const vendors = pgTable("vendors", {
   secondaryContactName: varchar("secondary_contact_name"),
   secondaryContactEmail: varchar("secondary_contact_email"),
   secondaryContactPhone: varchar("secondary_contact_phone"),
+  // Support contact information
+  supportEmail: varchar("support_email"),
+  supportPhone: varchar("support_phone"),
+  // Sales contact information
+  salesEmail: varchar("sales_email"),
+  salesPhone: varchar("sales_phone"),
   // Business information
   commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }),
   syncFrequency: varchar("sync_frequency").default("daily"), // hourly, daily, weekly, manual
