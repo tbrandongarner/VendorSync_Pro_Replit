@@ -93,6 +93,12 @@ export const products = pgTable("products", {
   variants: jsonb("variants"),
   isActive: boolean("is_active").default(true),
   lastSyncAt: timestamp("last_sync_at"),
+  // Change tracking fields
+  needsSync: boolean("needs_sync").default(false), // Indicates local changes need sync to Shopify
+  lastModifiedBy: varchar("last_modified_by").default("system"), // user, system, shopify
+  shopifyUpdatedAt: timestamp("shopify_updated_at"), // Track when Shopify last updated this product
+  localChanges: jsonb("local_changes"), // Track what fields were changed locally
+  syncConflict: boolean("sync_conflict").default(false), // Both local and Shopify changed since last sync
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -224,6 +230,23 @@ export const insertProductSchema = createInsertSchema(products).omit({
   createdAt: true,
   updatedAt: true,
   lastSyncAt: true,
+  shopifyUpdatedAt: true,
+});
+
+// Schema for product updates (edit form)
+export const updateProductSchema = createInsertSchema(products).pick({
+  name: true,
+  description: true,
+  price: true,
+  compareAtPrice: true,
+  inventory: true,
+  category: true,
+  status: true,
+  tags: true,
+}).extend({
+  price: z.union([z.string(), z.number()]).transform(val => String(val)).optional(),
+  compareAtPrice: z.union([z.string(), z.number()]).transform(val => String(val)).optional(),
+  inventory: z.union([z.string(), z.number()]).transform(val => Number(val)).optional(),
 });
 
 export const insertSyncJobSchema = createInsertSchema(syncJobs).omit({
@@ -249,6 +272,7 @@ export type Store = typeof stores.$inferSelect;
 export type InsertVendor = z.infer<typeof insertVendorSchema>;
 export type Vendor = typeof vendors.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type UpdateProduct = z.infer<typeof updateProductSchema>;
 export type Product = typeof products.$inferSelect;
 export type InsertSyncJob = z.infer<typeof insertSyncJobSchema>;
 export type SyncJob = typeof syncJobs.$inferSelect;

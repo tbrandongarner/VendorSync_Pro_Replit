@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import TopBar from "@/components/layout/top-bar";
@@ -9,7 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Box, Filter, ExternalLink, Grid3X3, List, LayoutGrid, Trash } from "lucide-react";
+import { ProductEditDialog } from "@/components/ui/product-edit-dialog";
+import { Search, Box, Filter, ExternalLink, Grid3X3, List, LayoutGrid, Trash, Edit, RefreshCw, AlertTriangle } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import type { Product, Vendor, Store, UpdateProduct } from "@shared/schema";
 
 export default function Products() {
   const { isAuthenticated } = useAuth();
@@ -21,23 +24,42 @@ export default function Products() {
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"cards" | "list" | "grid">("cards");
+  const [editProduct, setEditProduct] = useState<Product | null>(null);
 
-  const { data: products = [], isLoading: productsLoading, refetch: refetchProducts } = useQuery({
+  const { data: products = [], isLoading: productsLoading, refetch: refetchProducts } = useQuery<Product[]>({
     queryKey: ["/api/products"],
     enabled: isAuthenticated,
   });
 
-  const { data: vendors = [] } = useQuery({
+  const { data: vendors = [] } = useQuery<Vendor[]>({
     queryKey: ["/api/vendors"],
     enabled: isAuthenticated,
   });
 
-  const { data: stores = [] } = useQuery({
+  const { data: stores = [] } = useQuery<Store[]>({
     queryKey: ["/api/stores"],
     enabled: isAuthenticated,
   });
 
-  const filteredProducts = products.filter((product: any) => {
+  // Product update mutation
+  const updateProductMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: UpdateProduct }) => {
+      return apiRequest(`/api/products/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      toast({ title: "Success", description: "Product updated successfully" });
+    },
+    onError: (error) => {
+      console.error("Failed to update product:", error);
+      toast({ title: "Error", description: "Failed to update product", variant: "destructive" });
+    },
+  });
+
+  const filteredProducts = products.filter((product: Product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.brand?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -50,19 +72,40 @@ export default function Products() {
   });
 
   // Get unique brands for filter dropdown
-  const uniqueBrands = Array.from(new Set(products.map((p: any) => p.brand).filter(Boolean)));
+  const uniqueBrands = Array.from(new Set(products.map((p: Product) => p.brand).filter(Boolean)));
   
   // Get unique statuses for filter dropdown
-  const uniqueStatuses = Array.from(new Set(products.map((p: any) => p.status).filter(Boolean)));
+  const uniqueStatuses = Array.from(new Set(products.map((p: Product) => p.status).filter(Boolean)));
 
   const getVendorName = (vendorId: number) => {
-    const vendor = vendors.find((v: any) => v.id === vendorId);
+    const vendor = vendors.find((v: Vendor) => v.id === vendorId);
     return vendor?.name || 'Unknown Vendor';
   };
 
   const getStoreName = (storeId: number) => {
-    const store = stores.find((s: any) => s.id === storeId);
+    const store = stores.find((s: Store) => s.id === storeId);
     return store?.name || 'Unknown Store';
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setEditProduct(product);
+  };
+
+  const handleSaveProduct = async (data: UpdateProduct) => {
+    if (editProduct) {
+      await updateProductMutation.mutateAsync({ id: editProduct.id, data });
+      setEditProduct(null);
+    }
+  };
+
+  const syncProductsNeedingSync = async () => {
+    const productsToSync = products.filter(p => p.needsSync);
+    if (productsToSync.length === 0) {
+      toast({ title: "Info", description: "No products need syncing" });
+      return;
+    }
+    // TODO: Implement batch sync for products that need sync
+    toast({ title: "Info", description: `${productsToSync.length} products marked for sync` });
   };
 
   const formatPrice = (price: string | number) => {
@@ -118,6 +161,16 @@ export default function Products() {
                   Delete All
                 </Button>
                 
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={syncProductsNeedingSync}
+                  disabled={products.filter(p => p.needsSync).length === 0}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Sync Changes ({products.filter(p => p.needsSync).length})
+                </Button>
+                
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-600">View:</span>
                   <div className="flex rounded-lg border border-gray-200 overflow-hidden">
@@ -169,7 +222,7 @@ export default function Products() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Vendors</SelectItem>
-                    {vendors.map((vendor: any) => (
+                    {vendors.map((vendor: Vendor) => (
                       <SelectItem key={vendor.id} value={vendor.id.toString()}>
                         {vendor.name}
                       </SelectItem>
@@ -271,7 +324,7 @@ export default function Products() {
               'grid-cols-1 md:grid-cols-3 lg:grid-cols-4'
             }`
           }`}>
-            {filteredProducts.map((product: any) => {
+            {filteredProducts.map((product: Product) => {
               if (viewMode === 'list') {
                 return (
                   <Card key={product.id} className="polaris-shadow hover:polaris-shadow-hover transition-all">
@@ -299,11 +352,27 @@ export default function Products() {
                             </span>
                           </div>
                         </div>
-                        {product.shopifyProductId && (
-                          <Button variant="outline" size="sm" className="ml-4">
-                            <ExternalLink className="w-4 h-4" />
+                        <div className="flex items-center space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleEditProduct(product)}
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit
                           </Button>
-                        )}
+                          {product.needsSync && (
+                            <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              Needs Sync
+                            </Badge>
+                          )}
+                          {product.shopifyProductId && (
+                            <Button variant="outline" size="sm">
+                              <ExternalLink className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -317,16 +386,33 @@ export default function Products() {
                   <CardHeader className={viewMode === 'grid' ? 'pb-2' : ''}>
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <CardTitle className={`truncate ${viewMode === 'grid' ? 'text-base' : 'text-lg'}`}>
-                          {product.name}
-                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                          <CardTitle className={`truncate ${viewMode === 'grid' ? 'text-base' : 'text-lg'}`}>
+                            {product.name}
+                          </CardTitle>
+                          {product.needsSync && (
+                            <Badge variant="secondary" className="bg-orange-100 text-orange-800 text-xs">
+                              <AlertTriangle className="w-3 h-3" />
+                            </Badge>
+                          )}
+                        </div>
                         <CardDescription className="truncate">
                           {getVendorName(product.vendorId)} {viewMode !== 'grid' && `• ${getStoreName(product.storeId)}`}
                         </CardDescription>
                       </div>
-                      <Badge className={getStatusColor(product.status || 'active')}>
-                        {product.status || 'Active'}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleEditProduct(product)}
+                          className="text-xs"
+                        >
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <Badge className={getStatusColor(product.status || 'active')}>
+                          {product.status || 'Active'}
+                        </Badge>
+                      </div>
                     </div>
                   </CardHeader>
                   
@@ -390,6 +476,16 @@ export default function Products() {
               );
             })}
           </div>
+        )}
+
+        {/* Edit Product Dialog */}
+        {editProduct && (
+          <ProductEditDialog
+            product={editProduct}
+            open={!!editProduct}
+            onOpenChange={(open) => !open && setEditProduct(null)}
+            onSave={handleSaveProduct}
+          />
         )}
       </div>
     </div>

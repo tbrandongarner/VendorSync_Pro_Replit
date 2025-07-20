@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { generateProductContent, generateProductDescription } from "./services/openai";
 import { initWebSocketService, getWebSocketService } from "./services/websocket";
-import { insertVendorSchema, insertStoreSchema, insertProductSchema } from "@shared/schema";
+import { insertVendorSchema, insertStoreSchema, insertProductSchema, updateProductSchema } from "@shared/schema";
 import fileUploadRoutes from "./routes/file-upload";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -178,6 +178,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating product:", error);
       res.status(500).json({ message: "Failed to create product" });
+    }
+  });
+
+  // Update product
+  app.put('/api/products/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const productId = parseInt(req.params.id);
+      
+      if (isNaN(productId)) {
+        return res.status(400).json({ message: 'Invalid product ID' });
+      }
+
+      const existingProduct = await storage.getProduct(productId);
+      if (!existingProduct) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+
+      // Parse and validate update data
+      const updateData = updateProductSchema.parse(req.body);
+      
+      // Track what fields are being changed
+      const localChanges: string[] = [];
+      if (updateData.name !== existingProduct.name) localChanges.push('name');
+      if (updateData.description !== existingProduct.description) localChanges.push('description');
+      if (updateData.price !== existingProduct.price) localChanges.push('price');
+      if (updateData.compareAtPrice !== existingProduct.compareAtPrice) localChanges.push('compareAtPrice');
+      if (updateData.inventory !== existingProduct.inventory) localChanges.push('inventory');
+      if (updateData.category !== existingProduct.category) localChanges.push('category');
+      if (updateData.status !== existingProduct.status) localChanges.push('status');
+      
+      const updatedProduct = await storage.updateProduct(productId, {
+        ...updateData,
+        needsSync: localChanges.length > 0, // Mark for sync if any changes
+        lastModifiedBy: 'user',
+        localChanges: localChanges,
+      });
+      
+      // Log activity
+      await storage.createActivity({
+        userId,
+        type: 'product_update',
+        description: `Updated product "${existingProduct.name}" - ${localChanges.join(', ')} changed`,
+        metadata: { productId, changes: localChanges }
+      });
+
+      // Send real-time update
+      const wsService = getWebSocketService();
+      if (wsService) {
+        wsService.sendActivityUpdate(userId, {
+          type: 'product_updated',
+          description: `Product "${existingProduct.name}" updated`,
+          metadata: { productId, needsSync: localChanges.length > 0 }
+        });
+      }
+      
+      res.json(updatedProduct);
+    } catch (error) {
+      console.error("Error updating product:", error);
+      res.status(500).json({ message: "Failed to update product" });
     }
   });
 

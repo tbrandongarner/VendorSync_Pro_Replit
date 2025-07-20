@@ -48,7 +48,7 @@ export interface IStorage {
   getProducts(vendorId?: number, storeId?: number): Promise<Product[]>;
   getProduct(id: number): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
-  updateProduct(id: number, updates: Partial<InsertProduct>): Promise<Product>;
+  updateProduct(id: number, updates: Partial<Product>): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
   
   // Sync job operations
@@ -176,7 +176,7 @@ export class DatabaseStorage implements IStorage {
     return newProduct;
   }
 
-  async updateProduct(id: number, updates: Partial<InsertProduct>): Promise<Product> {
+  async updateProduct(id: number, updates: Partial<Product>): Promise<Product> {
     const [updatedProduct] = await db
       .update(products)
       .set({ ...updates, updatedAt: new Date() })
