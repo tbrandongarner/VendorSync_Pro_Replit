@@ -70,19 +70,16 @@ export class ProductSyncService {
         totalProcessed: 0,
       };
 
-      // First, get vendor product data from their data source
+      // Get vendor product data from their data source
       const vendorProducts = await this.getVendorProducts(vendor);
       
-      // Then, sync with Shopify using SKU as primary identifier
-      if (options.direction === 'pull' || options.direction === 'bidirectional') {
-        const pullResult = await this.syncWithShopifyBySKU(vendor, vendorProducts, syncJob.id, options);
-        result = this.mergeResults(result, pullResult);
-      }
-
-      if (options.direction === 'push' || options.direction === 'bidirectional') {
-        // Push vendor products to Shopify store
-        const pushResult = await this.pushVendorProductsToShopify(vendor, vendorProducts, syncJob.id, options);
-        result = this.mergeResults(result, pushResult);
+      // If we have vendor products, use SKU-based sync, otherwise pull all products
+      if (vendorProducts.length > 0) {
+        // Sync with Shopify using SKU-based matching
+        result = await this.syncWithShopifyBySKU(vendor, vendorProducts, syncJob.id, options);
+      } else {
+        // If no vendor file data, pull all products from Shopify for this vendor
+        result = await this.pullFromShopify(vendor, syncJob.id, options);
       }
 
       await storage.updateSyncJob(syncJob.id, {
@@ -133,7 +130,40 @@ export class ProductSyncService {
 
       while (hasMore) {
         const response = await this.shopifyService.getProducts(batchSize, pageInfo);
-        const shopifyProducts = response.products;
+        let shopifyProducts = response.products;
+
+        // Filter products that match this vendor
+        // Include products where vendor field matches our vendor name or products with no vendor set
+        shopifyProducts = shopifyProducts.filter(product => {
+          // Check if product vendor matches our vendor name (case insensitive)
+          if (product.vendor && product.vendor.toLowerCase() === vendor.name.toLowerCase()) {
+            return true;
+          }
+          
+          // For products with no vendor set, check if they might belong to this vendor
+          // by looking at product title, tags, or other identifiers
+          if (!product.vendor) {
+            const productTitle = product.title.toLowerCase();
+            const vendorName = vendor.name.toLowerCase();
+            
+            // Check if vendor name appears in product title
+            if (productTitle.includes(vendorName)) {
+              return true;
+            }
+            
+            // Check tags for vendor name
+            if (product.tags && Array.isArray(product.tags)) {
+              const hasVendorTag = product.tags.some(tag => 
+                tag.toLowerCase().includes(vendorName)
+              );
+              if (hasVendorTag) {
+                return true;
+              }
+            }
+          }
+          
+          return false;
+        });
 
         await storage.updateSyncJob(syncJobId, {
           totalItems: result.totalProcessed + shopifyProducts.length,
@@ -147,6 +177,10 @@ export class ProductSyncService {
               vendor.id,
               this.store.id
             );
+            
+            // Set vendor name as brand for consistency
+            productData.brand = vendor.name;
+            productData.status = shopifyProduct.status === 'active' ? 'active' : 'archived';
 
             if (existingProduct) {
               // Update existing product
