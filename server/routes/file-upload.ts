@@ -41,8 +41,9 @@ router.post('/vendor/:vendorId/upload', upload.single('file'), async (req, res) 
       return res.status(404).json({ error: 'Vendor not found' });
     }
 
-    // Check if user owns this vendor
-    if (vendor.userId !== req.session?.user?.id) {
+    // Check if user owns this vendor (using Replit Auth format)
+    const userId = req.user?.claims?.sub;
+    if (!userId || vendor.userId !== userId) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
