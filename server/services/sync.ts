@@ -16,7 +16,7 @@ export interface BulkSyncResult {
 }
 
 export interface SyncOptions {
-  direction: 'shopify_to_local' | 'local_to_shopify' | 'bidirectional';
+  direction: 'shopify_to_local' | 'local_to_shopify' | 'bidirectional' | 'pull' | 'push';
   syncImages: boolean;
   syncInventory: boolean;
   syncPricing: boolean;
@@ -83,7 +83,7 @@ export class ProductSyncService {
       let failed = 0;
       const errors: string[] = [];
 
-      if (options.direction === 'shopify_to_local' || options.direction === 'bidirectional') {
+      if (options.direction === 'shopify_to_local' || options.direction === 'bidirectional' || options.direction === 'pull') {
         console.log('Fetching products from Shopify...');
         
         // Import storage to access vendor and product data
@@ -98,13 +98,15 @@ export class ProductSyncService {
 
         try {
           // Build Shopify API request
-          const shopifyDomain = this.store.shopifyDomain;
+          const shopifyStoreUrl = this.store.shopifyStoreUrl;
           const accessToken = this.store.shopifyAccessToken;
           
-          if (!shopifyDomain || !accessToken) {
+          if (!shopifyStoreUrl || !accessToken) {
             throw new Error('Shopify store credentials are missing');
           }
 
+          // Extract domain from URL (e.g., "https://mystore.myshopify.com" -> "mystore.myshopify.com")
+          const shopifyDomain = shopifyStoreUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
           console.log(`Fetching from Shopify store: ${shopifyDomain}`);
           
           // Fetch products from Shopify with vendor filtering
@@ -176,9 +178,8 @@ export class ProductSyncService {
                 await storage.updateProduct(existingProduct.id, {
                   name: shopifyProduct.title,
                   description: shopifyProduct.body_html || shopifyProduct.description,
-                  price: shopifyProduct.variants?.[0]?.price ? parseFloat(shopifyProduct.variants[0].price) : 0,
-                  compareAtPrice: shopifyProduct.variants?.[0]?.compare_at_price ? 
-                    parseFloat(shopifyProduct.variants[0].compare_at_price) : undefined,
+                  price: shopifyProduct.variants?.[0]?.price || '0',
+                  compareAtPrice: shopifyProduct.variants?.[0]?.compare_at_price || null,
                   inventory: shopifyProduct.variants?.[0]?.inventory_quantity || 0,
                   tags: shopifyProduct.tags ? shopifyProduct.tags.split(',').map((t: string) => t.trim()) : [],
                   images: shopifyProduct.images?.map((img: any) => img.src) || [],
@@ -196,9 +197,8 @@ export class ProductSyncService {
                   sku: shopifyProduct.variants?.[0]?.sku || `shopify-${shopifyProduct.id}`,
                   name: shopifyProduct.title,
                   description: shopifyProduct.body_html || shopifyProduct.description,
-                  price: shopifyProduct.variants?.[0]?.price ? parseFloat(shopifyProduct.variants[0].price) : 0,
-                  compareAtPrice: shopifyProduct.variants?.[0]?.compare_at_price ? 
-                    parseFloat(shopifyProduct.variants[0].compare_at_price) : undefined,
+                  price: shopifyProduct.variants?.[0]?.price || '0',
+                  compareAtPrice: shopifyProduct.variants?.[0]?.compare_at_price || null,
                   inventory: shopifyProduct.variants?.[0]?.inventory_quantity || 0,
                   tags: shopifyProduct.tags ? shopifyProduct.tags.split(',').map((t: string) => t.trim()) : [],
                   images: shopifyProduct.images?.map((img: any) => img.src) || [],
@@ -220,7 +220,7 @@ export class ProductSyncService {
         } catch (shopifyError) {
           console.error('Shopify API error:', shopifyError);
           errors.push(`Shopify sync failed: ${shopifyError instanceof Error ? shopifyError.message : 'Unknown error'}`);
-          failed++;
+          failed = 1; // Mark as failed
         }
       }
 
