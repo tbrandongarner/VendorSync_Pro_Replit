@@ -197,6 +197,12 @@ export default function UploadedProducts() {
                           )}
                         </Button>
                       )}
+                      
+                      {/* Show sync status */}
+                      <div className="text-sm text-gray-600">
+                        {(products as any[]).filter(p => p.status === 'synced').length} synced, {' '}
+                        {(products as any[]).filter(p => p.status === 'failed').length} failed
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>

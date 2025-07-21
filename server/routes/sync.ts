@@ -88,8 +88,7 @@ router.post('/vendor/:vendorId', isAuthenticated, async (req: any, res) => {
               if (result.success) {
                 // Update uploaded product status
                 await storage.updateUploadedProduct(uploadedProduct.id, {
-                  status: 'synced',
-                  syncedProductId: result.productId
+                  status: 'synced'
                 });
                 
                 if (result.created) created++;

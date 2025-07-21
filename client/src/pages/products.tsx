@@ -59,6 +59,9 @@ export default function Products() {
     },
   });
 
+  // Add sync status filter state
+  const [syncStatusFilter, setSyncStatusFilter] = useState<string>("all");
+
   const filteredProducts = products.filter((product: Product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -67,8 +70,11 @@ export default function Products() {
     const matchesStore = selectedStore === "all" || product.storeId.toString() === selectedStore;
     const matchesBrand = selectedBrand === "all" || product.brand === selectedBrand;
     const matchesStatus = selectedStatus === "all" || product.status === selectedStatus;
+    const matchesSync = syncStatusFilter === "all" || 
+                       (syncStatusFilter === "needs_sync" && product.needsSync) ||
+                       (syncStatusFilter === "synced" && !product.needsSync);
     
-    return matchesSearch && matchesVendor && matchesStore && matchesBrand && matchesStatus;
+    return matchesSearch && matchesVendor && matchesStore && matchesBrand && matchesStatus && matchesSync;
   });
 
   // Get unique brands for filter dropdown
@@ -256,6 +262,27 @@ export default function Products() {
                   </SelectContent>
                 </Select>
 
+                <Select value={syncStatusFilter} onValueChange={setSyncStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sync Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Products</SelectItem>
+                    <SelectItem value="needs_sync">
+                      <div className="flex items-center">
+                        <AlertTriangle className="w-4 h-4 mr-2 text-orange-500" />
+                        Needs Sync
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="synced">
+                      <div className="flex items-center">
+                        <RefreshCw className="w-4 h-4 mr-2 text-green-500" />
+                        Synced
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+
                 <Button 
                   variant="outline" 
                   onClick={() => {
@@ -264,6 +291,7 @@ export default function Products() {
                     setSelectedStore("all");
                     setSelectedBrand("all");
                     setSelectedStatus("all");
+                    setSyncStatusFilter("all");
                   }}
                 >
                   Clear All

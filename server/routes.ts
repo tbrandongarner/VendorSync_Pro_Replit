@@ -700,6 +700,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // File upload routes
   app.use('/api/files', fileUploadRoutes);
   
+  // Vendor import routes
+  const { default: vendorImportRoutes } = await import('./routes/vendor-import.js');
+  app.use('/api/import', vendorImportRoutes);
+  
   // Sync routes
   const { default: syncRoutes } = await import('./routes/sync.js');
   app.use('/api/sync', syncRoutes);
