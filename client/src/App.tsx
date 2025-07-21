@@ -8,6 +8,7 @@ import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import Vendors from "@/pages/vendors";
 import Products from "@/pages/products";
+import UploadedProducts from "@/pages/uploaded-products";
 import Stores from "@/pages/stores";
 import SyncManager from "@/pages/sync-manager";
 import AiContent from "@/pages/ai-content";
@@ -36,6 +37,7 @@ function Router() {
           <Route path="/" component={Dashboard} />
           <Route path="/vendors" component={Vendors} />
           <Route path="/products" component={Products} />
+          <Route path="/uploaded-products" component={UploadedProducts} />
           <Route path="/stores" component={Stores} />
           <Route path="/sync" component={SyncManager} />
           <Route path="/ai" component={AiContent} />

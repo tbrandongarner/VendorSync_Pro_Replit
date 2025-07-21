@@ -347,6 +347,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Uploaded products endpoint
+  app.get('/api/uploaded-products', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get user's vendors
+      const vendors = await storage.getVendors(userId);
+      const vendorIds = vendors.map(v => v.id);
+      
+      // Get uploaded products for user's vendors
+      const uploadedProducts = [];
+      for (const vendorId of vendorIds) {
+        const vendorProducts = await storage.getUploadedProducts(vendorId);
+        uploadedProducts.push(...vendorProducts);
+      }
+      
+      res.json(uploadedProducts);
+    } catch (error) {
+      console.error("Error fetching uploaded products:", error);
+      res.status(500).json({ message: "Failed to fetch uploaded products" });
+    }
+  });
+
   // Sync routes
   app.get('/api/sync/jobs', isAuthenticated, async (req: any, res) => {
     try {
@@ -676,6 +699,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // File upload routes
   app.use('/api/files', fileUploadRoutes);
+  
+  // Sync routes
+  const { default: syncRoutes } = await import('./routes/sync.js');
+  app.use('/api/sync', syncRoutes);
 
   return httpServer;
 }

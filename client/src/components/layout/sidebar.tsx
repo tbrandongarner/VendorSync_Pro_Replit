@@ -13,7 +13,8 @@ import {
   Bot, 
   Settings,
   Menu,
-  X
+  X,
+  Upload
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -25,6 +26,7 @@ export default function Sidebar() {
     { name: 'Dashboard', href: '/', icon: BarChart3 },
     { name: 'Vendors', href: '/vendors', icon: Users },
     { name: 'Products', href: '/products', icon: Package },
+    { name: 'Uploaded Products', href: '/uploaded-products', icon: Upload },
     { name: 'Stores', href: '/stores', icon: Store },
     { name: 'Synchronization', href: '/sync', icon: FolderSync },
     { name: 'AI Content', href: '/ai', icon: Bot },
