@@ -494,7 +494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { ProductSyncService } = await import('./services/sync');
       const syncService = new ProductSyncService(store);
       
-      await syncService.updateProductInventory(productId, quantity, locationId);
+      await syncService.updateProductInventory(productId, quantity);
       
       res.json({ message: "Inventory updated successfully" });
     } catch (error) {
