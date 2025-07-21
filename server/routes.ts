@@ -404,9 +404,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { ProductSyncService } = await import('./services/sync');
       const syncService = new ProductSyncService(store);
 
+      // Create sync job first
+      const syncJob = await storage.createSyncJob({
+        vendorId,
+        storeId,
+        status: 'pending',
+        totalItems: 0,
+        processedItems: 0,
+        progress: 0,
+        startedAt: new Date()
+      });
+
       // Start sync process in background
       setImmediate(async () => {
         try {
+          // Update job to running
+          await storage.updateSyncJob(syncJob.id, {
+            status: 'running',
+            startedAt: new Date()
+          });
+
           const result = await syncService.syncProducts(vendorId, {
             direction,
             syncImages: options.syncImages !== false,
@@ -418,6 +435,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             batchSize: options.batchSize || 50,
           });
 
+          // Update job to completed
+          await storage.updateSyncJob(syncJob.id, {
+            status: 'completed',
+            processedItems: result.created + result.updated + result.failed,
+            progress: 100,
+            completedAt: new Date()
+          });
+
           // Log activity
           await storage.createActivity({
             userId,
@@ -427,6 +452,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         } catch (error) {
           console.error("Sync process failed:", error);
+          
+          // Update job to failed
+          await storage.updateSyncJob(syncJob.id, {
+            status: 'failed',
+            completedAt: new Date()
+          });
+
           await storage.createActivity({
             userId,
             type: 'vendor_sync',
@@ -436,7 +468,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      res.json({ message: "Sync started successfully" });
+      res.json({ 
+        message: "Sync started successfully", 
+        jobId: syncJob.id,
+        success: true 
+      });
     } catch (error) {
       console.error("Error starting sync:", error);
       res.status(500).json({ message: "Failed to start sync" });

@@ -51,6 +51,7 @@ export interface IStorage {
   getProducts(vendorId?: number, storeId?: number): Promise<Product[]>;
   getProduct(id: number): Promise<Product | undefined>;
   getProductBySku(sku: string): Promise<Product | undefined>;
+  getProductsByVendor(vendorId: number): Promise<Product[]>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, updates: Partial<Product>): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
@@ -188,6 +189,12 @@ export class DatabaseStorage implements IStorage {
   async getProductBySku(sku: string): Promise<Product | undefined> {
     const [product] = await db.select().from(products).where(eq(products.sku, sku));
     return product;
+  }
+
+  async getProductsByVendor(vendorId: number): Promise<Product[]> {
+    return await db.select().from(products)
+      .where(eq(products.vendorId, vendorId))
+      .orderBy(desc(products.createdAt));
   }
 
   async createProduct(product: InsertProduct): Promise<Product> {
