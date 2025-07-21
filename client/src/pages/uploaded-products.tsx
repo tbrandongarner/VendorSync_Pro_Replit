@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import TopBar from "@/components/layout/top-bar";
+import { SyncStatusNotification } from "@/components/ui/sync-status-notification";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,16 +29,23 @@ export default function UploadedProducts() {
     enabled: isAuthenticated,
   });
 
+  // Query sync jobs to show real-time status
+  const { data: syncJobs = [] } = useQuery({
+    queryKey: ["/api/sync/jobs"],
+    enabled: isAuthenticated,
+    refetchInterval: 2000, // Poll every 2 seconds
+  });
+
   const syncProductMutation = useMutation({
     mutationFn: async (vendorId: number) => {
       return await apiRequest("POST", `/api/sync/vendor/${vendorId}`);
     },
-    onSuccess: () => {
+    onSuccess: (data, vendorId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/uploaded-products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sync/jobs"] });
       toast({
         title: "Sync Started",
-        description: "Products are being synced to Shopify",
+        description: `Started syncing products to Shopify. Watch for progress updates below.`,
       });
     },
     onError: (error: any) => {
@@ -57,6 +65,28 @@ export default function UploadedProducts() {
     
     return matchesSearch && matchesVendor && matchesStatus;
   });
+
+  // Get sync status for vendors
+  const getVendorSyncStatus = (vendorId: number) => {
+    const vendorJobs = syncJobs.filter((job: any) => job.vendorId === vendorId);
+    const latestJob = vendorJobs.sort((a: any, b: any) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )[0];
+    
+    return latestJob || null;
+  };
+
+  // Group products by vendor for better sync status display
+  const productsByVendor = filteredProducts.reduce((acc: any, product: any) => {
+    if (!acc[product.vendorId]) {
+      acc[product.vendorId] = {
+        vendor: vendors.find((v: any) => v.id === product.vendorId),
+        products: []
+      };
+    }
+    acc[product.vendorId].products.push(product);
+    return acc;
+  }, {});
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -167,43 +197,80 @@ export default function UploadedProducts() {
               const vendorId = (products as any[])[0]?.vendorId;
               const pendingCount = (products as any[]).filter(p => p.status === 'pending').length;
               
+              const syncStatus = getVendorSyncStatus(vendorId);
+              const isCurrentlySync = syncStatus?.status === 'running';
+              
               return (
                 <Card key={vendorName} className="polaris-shadow">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="text-lg">{vendorName}</CardTitle>
+                        <CardTitle className="text-lg flex items-center space-x-2">
+                          <span>{vendorName}</span>
+                          <Badge variant="outline">{(products as any[]).length} products</Badge>
+                        </CardTitle>
                         <CardDescription>
-                          {(products as any[]).length} products uploaded
-                          {pendingCount > 0 && ` • ${pendingCount} pending sync`}
+                          {(products as any[]).filter(p => p.status === 'synced').length} synced • {' '}
+                          {(products as any[]).filter(p => p.status === 'failed').length} failed • {' '}
+                          {pendingCount} pending
                         </CardDescription>
                       </div>
-                      {pendingCount > 0 && (
-                        <Button
-                          onClick={() => syncProductMutation.mutate(vendorId)}
-                          disabled={syncProductMutation.isPending}
-                          className="bg-emerald-600 hover:bg-emerald-700"
-                        >
-                          {syncProductMutation.isPending ? (
-                            <>
-                              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                              Syncing...
-                            </>
-                          ) : (
-                            <>
-                              <RefreshCw className="w-4 h-4 mr-2" />
-                              Sync {pendingCount} Products
-                            </>
-                          )}
-                        </Button>
-                      )}
                       
-                      {/* Show sync status */}
-                      <div className="text-sm text-gray-600">
-                        {(products as any[]).filter(p => p.status === 'synced').length} synced, {' '}
-                        {(products as any[]).filter(p => p.status === 'failed').length} failed
+                      <div className="flex items-center space-x-3">
+                        {/* Sync Status Badge */}
+                        {syncStatus && (
+                          <Badge 
+                            variant={syncStatus.status === 'completed' ? 'default' : 
+                                   syncStatus.status === 'failed' ? 'destructive' : 'secondary'}
+                            className={syncStatus.status === 'running' ? 'bg-blue-100 text-blue-800' : ''}
+                          >
+                            {syncStatus.status === 'running' && <RefreshCw className="w-3 h-3 mr-1 animate-spin" />}
+                            {syncStatus.status === 'completed' && '✓ '}
+                            {syncStatus.status === 'failed' && '✗ '}
+                            {syncStatus.status === 'running' ? `Syncing ${syncStatus.progress || 0}%` :
+                             syncStatus.status === 'completed' ? 'Sync Complete' :
+                             syncStatus.status === 'failed' ? 'Sync Failed' : syncStatus.status}
+                          </Badge>
+                        )}
+                        
+                        {/* Sync Button */}
+                        {pendingCount > 0 && (
+                          <Button
+                            onClick={() => syncProductMutation.mutate(vendorId)}
+                            disabled={syncProductMutation.isPending || isCurrentlySync}
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                          >
+                            {syncProductMutation.isPending || isCurrentlySync ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                Syncing...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="w-4 h-4 mr-2" />
+                                Sync {pendingCount} Products
+                              </>
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </div>
+                    
+                    {/* Progress Bar for Running Sync */}
+                    {isCurrentlySync && (
+                      <div className="mt-3">
+                        <div className="flex justify-between text-xs text-gray-600 mb-1">
+                          <span>{syncStatus.processedItems || 0} of {(products as any[]).length} processed</span>
+                          <span>{syncStatus.progress || 0}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                            style={{ width: `${syncStatus.progress || 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -237,6 +304,9 @@ export default function UploadedProducts() {
             })}
           </div>
         )}
+        
+        {/* Sync Status Notifications */}
+        <SyncStatusNotification />
       </div>
     </div>
   );
