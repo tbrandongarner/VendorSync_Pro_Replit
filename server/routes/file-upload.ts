@@ -28,7 +28,7 @@ const upload = multer({
 });
 
 // Upload and parse vendor file
-router.post('/vendor/:vendorId/upload', upload.single('file'), async (req, res) => {
+router.post('/vendor/:vendorId/upload', upload.single('file'), async (req: any, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });

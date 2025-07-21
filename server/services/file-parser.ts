@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import * as csv from 'csv-parser';
+import csv from 'csv-parser';
 import { Readable } from 'stream';
 
 export interface ParsedProduct {
