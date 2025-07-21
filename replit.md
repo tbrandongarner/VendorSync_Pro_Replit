@@ -40,10 +40,25 @@ VendorSync Pro is a comprehensive vendor management platform for Shopify that co
 - Validated file upload with 5 products from test CSV (EcoFlow products)
 - Confirmed SKU-based parsing with Shopify export format compatibility
 - System ready for production vendor data synchronization
+- **MAJOR ENHANCEMENT (July 21, 2025):** Implemented comprehensive conflict resolution system
+- Added intelligent data precedence rules: vendor pricing authoritative for price/cost/MSRP/inventory
+- Created conflict resolution engine that handles 3-way conflicts (vendor/local/Shopify)
+- Built conflict resolution UI for manual intervention when auto-resolution fails
+- Established SKU as single source of truth with mandatory fields (SKU, Price, Cost, MSRP)
+- Implemented smart import modes: new products only, update existing only, or both
+- Added tracking for data sources and modification timestamps for audit trail
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+
+**Vendor Data Management Requirements:**
+- SKU is the single source of truth for product matching
+- Mandatory fields: SKU, Price, Cost, MSRP
+- Optional fields: Product name, description, quantity, photos, tags, collections
+- Vendor pricing sheets come in different formats but must support flexible parsing
+- System should update existing products and create new ones based on SKU presence
+- Always show which products are pending sync before synchronization
 
 ## System Architecture
 

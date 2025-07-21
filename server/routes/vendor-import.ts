@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { isAuthenticated } from '../replitAuth.js';
 import { storage } from '../storage.js';
 import { parseCSV, parseExcel } from '../services/file-parser.js';
+import { conflictResolver } from '../services/conflict-resolver.js';
 import multer from 'multer';
 
 const router = Router();
@@ -65,40 +66,60 @@ router.post('/vendor/:vendorId/import', upload.single('file'), isAuthenticated, 
       try {
         const existingProduct = existingSkus.get(productData.sku);
         
+        // Normalize vendor data to match expected format
+        const normalizedVendorData = {
+          sku: productData.sku,
+          name: productData.name,
+          price: productData.price?.toString(),
+          cost: productData.cost?.toString(),
+          msrp: productData.msrp?.toString(),
+          compareAtPrice: productData.compareAtPrice?.toString(),
+          inventory: productData.inventory,
+          description: productData.description,
+          category: productData.category,
+          tags: productData.tags,
+          images: productData.images,
+          lastVendorUpdate: new Date(),
+        };
+        
         if (existingProduct) {
           // Product exists - check if we should update it
           if (importMode === 'new_only') {
             continue; // Skip existing products
           }
           
-          // Check for changes
-          const hasChanges = 
-            existingProduct.price !== productData.price?.toString() ||
-            existingProduct.compareAtPrice !== productData.compareAtPrice?.toString() ||
-            existingProduct.inventory !== productData.inventory ||
-            existingProduct.description !== productData.description;
+          // Use conflict resolver to handle potential conflicts
+          const resolution = conflictResolver.resolveConflicts(
+            normalizedVendorData,
+            existingProduct,
+            existingProduct.shopifyData
+          );
           
-          if (hasChanges) {
-            // Update existing product
+          if (resolution.autoResolved) {
+            // Auto-resolve conflicts and update product
             await storage.updateProduct(existingProduct.id, {
-              price: productData.price?.toString() || existingProduct.price,
-              compareAtPrice: productData.compareAtPrice?.toString() || existingProduct.compareAtPrice,
-              inventory: productData.inventory || existingProduct.inventory,
-              description: productData.description || existingProduct.description,
+              ...resolution.resolvedData,
               needsSync: true,
               lastModifiedBy: 'vendor_import',
-              localChanges: ['price', 'inventory', 'description'].filter(field => {
-                switch (field) {
-                  case 'price': return existingProduct.price !== productData.price?.toString();
-                  case 'inventory': return existingProduct.inventory !== productData.inventory;
-                  case 'description': return existingProduct.description !== productData.description;
-                  default: return false;
-                }
-              })
+              vendorData: normalizedVendorData,
+              lastVendorUpdate: new Date(),
+              conflictState: 'none',
             });
             
             updatedProducts++;
             needsSync++;
+          } else {
+            // Conflicts require user intervention
+            await storage.updateProduct(existingProduct.id, {
+              ...existingProduct,
+              vendorData: normalizedVendorData,
+              lastVendorUpdate: new Date(),
+              conflictState: 'pending_resolution',
+              needsSync: false, // Don't sync until conflicts are resolved
+            });
+            
+            updatedProducts++;
+            // Note: These won't be synced until conflicts are resolved
           }
         } else {
           // New product - check if we should add it
