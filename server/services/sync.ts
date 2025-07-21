@@ -101,8 +101,17 @@ export class ProductSyncService {
           const shopifyStoreUrl = this.store.shopifyStoreUrl;
           const accessToken = this.store.shopifyAccessToken;
           
+          console.log(`Store credentials check:`, {
+            hasStoreUrl: !!shopifyStoreUrl,
+            storeUrl: shopifyStoreUrl,
+            hasAccessToken: !!accessToken,
+            accessTokenLength: accessToken?.length
+          });
+
           if (!shopifyStoreUrl || !accessToken) {
-            throw new Error('Shopify store credentials are missing');
+            const error = `Shopify store credentials are missing: storeUrl=${!!shopifyStoreUrl}, accessToken=${!!accessToken}`;
+            console.error(error);
+            throw new Error(error);
           }
 
           // Extract domain from URL (e.g., "https://mystore.myshopify.com" -> "mystore.myshopify.com")
@@ -124,6 +133,8 @@ export class ProductSyncService {
               url += `&page_info=${nextPageInfo}`;
             }
 
+            console.log(`Making API request to: ${url}`);
+            
             const response = await fetch(url, {
               headers: {
                 'X-Shopify-Access-Token': accessToken,
@@ -131,12 +142,20 @@ export class ProductSyncService {
               }
             });
 
+            console.log(`API response status: ${response.status} ${response.statusText}`);
+
             if (!response.ok) {
-              throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
+              const errorText = await response.text();
+              console.error(`Shopify API error details:`, errorText);
+              throw new Error(`Shopify API error: ${response.status} ${response.statusText} - ${errorText}`);
             }
 
             const data = await response.json();
             console.log(`Retrieved ${data.products?.length || 0} products from page ${pageCount}`);
+            
+            if (data.products?.length > 0) {
+              console.log(`Sample product titles:`, data.products.slice(0, 3).map((p: any) => p.title));
+            }
             
             if (data.products && data.products.length > 0) {
               // Filter products for this vendor using flexible matching
