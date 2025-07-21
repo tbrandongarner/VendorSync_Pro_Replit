@@ -86,13 +86,51 @@ router.post('/vendor/:vendorId', isAuthenticated, async (req: any, res) => {
               const result = await syncService.syncSingleProduct(productData, vendorId);
               
               if (result.success) {
+                // Create or update product in main products table
+                const existingProduct = await storage.getProductBySku(uploadedProduct.sku);
+                
+                if (existingProduct) {
+                  // Update existing product
+                  await storage.updateProduct(existingProduct.id, {
+                    name: uploadedProduct.name,
+                    description: uploadedProduct.description,
+                    price: uploadedProduct.price,
+                    compareAtPrice: uploadedProduct.compareAtPrice,
+                    inventory: uploadedProduct.inventory || 0,
+                    tags: uploadedProduct.tags ? JSON.parse(uploadedProduct.tags) : [],
+                    images: uploadedProduct.images ? JSON.parse(uploadedProduct.images) : [],
+                    shopifyProductId: result.productId?.toString(),
+                    needsSync: false,
+                    lastSyncAt: new Date(),
+                    lastModifiedBy: 'vendor_import'
+                  });
+                  updated++;
+                } else {
+                  // Create new product
+                  await storage.createProduct({
+                    vendorId: vendorId,
+                    storeId: store.id,
+                    sku: uploadedProduct.sku,
+                    name: uploadedProduct.name,
+                    description: uploadedProduct.description,
+                    price: uploadedProduct.price,
+                    compareAtPrice: uploadedProduct.compareAtPrice,
+                    inventory: uploadedProduct.inventory || 0,
+                    tags: uploadedProduct.tags ? JSON.parse(uploadedProduct.tags) : [],
+                    images: uploadedProduct.images ? JSON.parse(uploadedProduct.images) : [],
+                    shopifyProductId: result.productId?.toString(),
+                    status: 'active',
+                    needsSync: false,
+                    lastSyncAt: new Date(),
+                    lastModifiedBy: 'vendor_import'
+                  });
+                  created++;
+                }
+                
                 // Update uploaded product status
                 await storage.updateUploadedProduct(uploadedProduct.id, {
                   status: 'synced'
                 });
-                
-                if (result.created) created++;
-                else updated++;
               } else {
                 await storage.updateUploadedProduct(uploadedProduct.id, {
                   status: 'failed',
