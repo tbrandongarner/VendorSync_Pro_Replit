@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Users, Mail, Globe, MoreHorizontal, Phone, User, Headphones, DollarSign } from "lucide-react";
+import { Plus, Search, Users, Mail, Globe, MoreHorizontal, Phone, User, Headphones, DollarSign, RefreshCw } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,6 +61,40 @@ export default function Vendors() {
     },
   });
 
+  const syncVendorMutation = useMutation({
+    mutationFn: async (vendorId: number) => {
+      const response = await apiRequest("POST", `/api/sync/vendor/${vendorId}`);
+      return response;
+    },
+    onSuccess: (data, vendorId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sync/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      toast({
+        title: "Sync Started",
+        description: "Vendor products sync has been initiated",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized", 
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Sync Failed",
+        description: "Failed to start vendor sync",
+        variant: "destructive",
+      });
+    },
+  });
+
   const filteredVendors = vendors.filter((vendor: any) =>
     vendor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     vendor.contactEmail.toLowerCase().includes(searchTerm.toLowerCase())
@@ -80,6 +114,18 @@ export default function Vendors() {
     if (window.confirm(`Are you sure you want to delete ${vendor.name}? This action cannot be undone.`)) {
       deleteVendorMutation.mutate(vendor.id);
     }
+  };
+
+  const handleSyncVendor = (vendor: any) => {
+    if (vendor.dataSourceType === 'csv_upload' && !vendor.dataSourceConfig?.file_url) {
+      toast({
+        title: "No File Uploaded",
+        description: "Please upload a CSV file before syncing products",
+        variant: "destructive",
+      });
+      return;
+    }
+    syncVendorMutation.mutate(vendor.id);
   };
 
   const getStatusColor = (status: string) => {
@@ -222,6 +268,13 @@ export default function Vendors() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleEditVendor(vendor)}>
                           Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleSyncVendor(vendor)}
+                          disabled={syncVendorMutation.isPending}
+                        >
+                          <RefreshCw className={`w-4 h-4 mr-2 ${syncVendorMutation.isPending ? 'animate-spin' : ''}`} />
+                          Sync Products
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           onClick={() => handleDeleteVendor(vendor)}
