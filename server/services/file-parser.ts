@@ -28,15 +28,15 @@ export interface DataSourceConfig {
 }
 
 const DEFAULT_CONFIG: DataSourceConfig = {
-  sku_column: 'SKU',
-  name_column: 'Product Name',
-  description_column: 'Description',
-  price_column: 'Price',
-  compare_price_column: 'Compare At Price',
+  sku_column: 'Variant SKU',
+  name_column: 'Title',
+  description_column: 'Body (HTML)',
+  price_column: 'Variant Price',
+  compare_price_column: 'Variant Compare At Price',
   inventory_column: 'Inventory',
   category_column: 'Category',
-  barcode_column: 'Barcode',
-  images_column: 'Images'
+  barcode_column: 'Variant Barcode',
+  images_column: 'Image Src'
 };
 
 export async function parseCSV(buffer: Buffer, config: DataSourceConfig = {}): Promise<ParsedProduct[]> {
