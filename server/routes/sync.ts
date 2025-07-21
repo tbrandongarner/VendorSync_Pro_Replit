@@ -101,7 +101,6 @@ router.post('/vendor/:vendorId', isAuthenticated, async (req: any, res) => {
                     images: uploadedProduct.images ? JSON.parse(uploadedProduct.images) : [],
                     shopifyProductId: result.productId?.toString(),
                     needsSync: false,
-                    lastSyncAt: new Date(),
                     lastModifiedBy: 'vendor_import'
                   });
                   updated++;
@@ -121,7 +120,6 @@ router.post('/vendor/:vendorId', isAuthenticated, async (req: any, res) => {
                     shopifyProductId: result.productId?.toString(),
                     status: 'active',
                     needsSync: false,
-                    lastSyncAt: new Date(),
                     lastModifiedBy: 'vendor_import'
                   });
                   created++;

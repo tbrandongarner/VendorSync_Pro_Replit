@@ -21,6 +21,8 @@ import {
   type InsertActivity,
   type AiGeneration,
   type InsertAiGeneration,
+  type UploadedProduct,
+  type InsertUploadedProduct,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, count } from "drizzle-orm";
@@ -161,17 +163,21 @@ export class DatabaseStorage implements IStorage {
 
   // Product operations
   async getProducts(vendorId?: number, storeId?: number): Promise<Product[]> {
-    let query = db.select().from(products);
-    
     if (vendorId && storeId) {
-      query = query.where(and(eq(products.vendorId, vendorId), eq(products.storeId, storeId)));
+      return await db.select().from(products)
+        .where(and(eq(products.vendorId, vendorId), eq(products.storeId, storeId)))
+        .orderBy(desc(products.createdAt));
     } else if (vendorId) {
-      query = query.where(eq(products.vendorId, vendorId));
+      return await db.select().from(products)
+        .where(eq(products.vendorId, vendorId))
+        .orderBy(desc(products.createdAt));
     } else if (storeId) {
-      query = query.where(eq(products.storeId, storeId));
+      return await db.select().from(products)
+        .where(eq(products.storeId, storeId))
+        .orderBy(desc(products.createdAt));
     }
     
-    return await query.orderBy(desc(products.createdAt));
+    return await db.select().from(products).orderBy(desc(products.createdAt));
   }
 
   async getProduct(id: number): Promise<Product | undefined> {
@@ -212,13 +218,13 @@ export class DatabaseStorage implements IStorage {
 
   // Sync job operations
   async getSyncJobs(vendorId?: number): Promise<SyncJob[]> {
-    let query = db.select().from(syncJobs);
-    
     if (vendorId) {
-      query = query.where(eq(syncJobs.vendorId, vendorId));
+      return await db.select().from(syncJobs)
+        .where(eq(syncJobs.vendorId, vendorId))
+        .orderBy(desc(syncJobs.createdAt));
     }
     
-    return await query.orderBy(desc(syncJobs.createdAt));
+    return await db.select().from(syncJobs).orderBy(desc(syncJobs.createdAt));
   }
 
   async createSyncJob(syncJob: InsertSyncJob): Promise<SyncJob> {

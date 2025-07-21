@@ -306,6 +306,12 @@ export const insertAiGenerationSchema = createInsertSchema(aiGenerations).omit({
   createdAt: true,
 });
 
+export const insertUploadedProductSchema = createInsertSchema(uploadedProducts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -322,3 +328,5 @@ export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type Activity = typeof activities.$inferSelect;
 export type InsertAiGeneration = z.infer<typeof insertAiGenerationSchema>;
 export type AiGeneration = typeof aiGenerations.$inferSelect;
+export type InsertUploadedProduct = z.infer<typeof insertUploadedProductSchema>;
+export type UploadedProduct = typeof uploadedProducts.$inferSelect;

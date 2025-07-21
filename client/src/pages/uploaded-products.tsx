@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Vendor, UploadedProduct, SyncJob } from "@shared/schema";
 import TopBar from "@/components/layout/top-bar";
 import { SyncStatusNotification } from "@/components/ui/sync-status-notification";
 import { Button } from "@/components/ui/button";
@@ -19,18 +20,18 @@ export default function UploadedProducts() {
   const [selectedVendor, setSelectedVendor] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  const { data: vendors = [] } = useQuery({
+  const { data: vendors = [] } = useQuery<Vendor[]>({
     queryKey: ["/api/vendors"],
     enabled: isAuthenticated,
   });
 
-  const { data: uploadedProducts = [], isLoading } = useQuery({
+  const { data: uploadedProducts = [], isLoading } = useQuery<UploadedProduct[]>({
     queryKey: ["/api/uploaded-products"],
     enabled: isAuthenticated,
   });
 
   // Query sync jobs to show real-time status
-  const { data: syncJobs = [] } = useQuery({
+  const { data: syncJobs = [] } = useQuery<SyncJob[]>({
     queryKey: ["/api/sync/jobs"],
     enabled: isAuthenticated,
     refetchInterval: 2000, // Poll every 2 seconds
@@ -57,7 +58,7 @@ export default function UploadedProducts() {
     },
   });
 
-  const filteredProducts = uploadedProducts.filter((product: any) => {
+  const filteredProducts = uploadedProducts.filter((product: UploadedProduct) => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.sku.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesVendor = selectedVendor === "all" || product.vendorId.toString() === selectedVendor;
@@ -68,19 +69,19 @@ export default function UploadedProducts() {
 
   // Get sync status for vendors
   const getVendorSyncStatus = (vendorId: number) => {
-    const vendorJobs = syncJobs.filter((job: any) => job.vendorId === vendorId);
-    const latestJob = vendorJobs.sort((a: any, b: any) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    const vendorJobs = syncJobs.filter((job: SyncJob) => job.vendorId === vendorId);
+    const latestJob = vendorJobs.sort((a: SyncJob, b: SyncJob) => 
+      new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
     )[0];
     
     return latestJob || null;
   };
 
   // Group products by vendor for better sync status display
-  const productsByVendor = filteredProducts.reduce((acc: any, product: any) => {
+  const productsByVendor = filteredProducts.reduce((acc: Record<number, { vendor: Vendor | undefined; products: UploadedProduct[] }>, product: UploadedProduct) => {
     if (!acc[product.vendorId]) {
       acc[product.vendorId] = {
-        vendor: vendors.find((v: any) => v.id === product.vendorId),
+        vendor: vendors.find((v: Vendor) => v.id === product.vendorId),
         products: []
       };
     }
