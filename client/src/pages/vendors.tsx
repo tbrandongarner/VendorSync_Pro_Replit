@@ -7,6 +7,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import TopBar from "@/components/layout/top-bar";
 import VendorModal from "@/components/modals/vendor-modal";
 import FileUploadModal from "@/components/modals/file-upload-modal";
+import { SyncStatusNotification } from "@/components/ui/sync-status-notification";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,13 @@ export default function Vendors() {
   const [searchTerm, setSearchTerm] = useState("");
   const [uploadingVendor, setUploadingVendor] = useState(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
+  // Query sync jobs to show real-time status
+  const { data: syncJobs = [] } = useQuery({
+    queryKey: ["/api/sync/jobs"],
+    enabled: isAuthenticated,
+    refetchInterval: 2000, // Poll every 2 seconds
+  });
 
   const { data: vendors = [], isLoading: vendorsLoading } = useQuery({
     queryKey: ["/api/vendors"],
@@ -73,9 +81,10 @@ export default function Vendors() {
       queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sync/jobs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      
       toast({
         title: "Sync Started",
-        description: "Vendor products sync has been initiated",
+        description: `Started syncing products to Shopify. Watch the vendor card for progress updates.`,
       });
     },
     onError: (error) => {
@@ -102,6 +111,42 @@ export default function Vendors() {
     vendor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     vendor.contactEmail.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Get sync status for each vendor
+  const getVendorSyncStatus = (vendorId: number) => {
+    const vendorJobs = syncJobs.filter((job: any) => job.vendorId === vendorId);
+    const latestJob = vendorJobs.sort((a: any, b: any) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )[0];
+    
+    return latestJob || null;
+  };
+
+  const getSyncStatusBadge = (status: string, progress?: number) => {
+    switch (status) {
+      case 'running':
+        return (
+          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+            <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+            Syncing {progress}%
+          </Badge>
+        );
+      case 'completed':
+        return (
+          <Badge variant="secondary" className="bg-green-100 text-green-800">
+            ✓ Sync Complete
+          </Badge>
+        );
+      case 'failed':
+        return (
+          <Badge variant="destructive">
+            ✗ Sync Failed
+          </Badge>
+        );
+      default:
+        return null;
+    }
+  };
 
   const handleAddVendor = () => {
     setEditingVendor(null);
@@ -248,6 +293,11 @@ export default function Vendors() {
                             <Mail className="w-3 h-3 mr-1" />
                             {vendor.contactEmail}
                           </div>
+                          {/* Sync Status */}
+                          {(() => {
+                            const syncStatus = getVendorSyncStatus(vendor.id);
+                            return syncStatus ? getSyncStatusBadge(syncStatus.status, syncStatus.progress) : null;
+                          })()}
                           {vendor.phone && (
                             <div className="flex items-center">
                               <Phone className="w-3 h-3 mr-1" />
