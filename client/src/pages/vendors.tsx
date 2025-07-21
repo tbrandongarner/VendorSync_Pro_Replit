@@ -6,11 +6,12 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import TopBar from "@/components/layout/top-bar";
 import VendorModal from "@/components/modals/vendor-modal";
+import FileUploadModal from "@/components/modals/file-upload-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Users, Mail, Globe, MoreHorizontal, Phone, User, Headphones, DollarSign, RefreshCw } from "lucide-react";
+import { Plus, Search, Users, Mail, Globe, MoreHorizontal, Phone, User, Headphones, DollarSign, RefreshCw, Upload } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,8 @@ export default function Vendors() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [uploadingVendor, setUploadingVendor] = useState(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const { data: vendors = [], isLoading: vendorsLoading } = useQuery({
     queryKey: ["/api/vendors"],
@@ -126,6 +129,11 @@ export default function Vendors() {
       return;
     }
     syncVendorMutation.mutate(vendor.id);
+  };
+
+  const handleUploadFile = (vendor: any) => {
+    setUploadingVendor(vendor);
+    setIsUploadModalOpen(true);
   };
 
   const getStatusColor = (status: string) => {
@@ -269,6 +277,10 @@ export default function Vendors() {
                         <DropdownMenuItem onClick={() => handleEditVendor(vendor)}>
                           Edit
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleUploadFile(vendor)}>
+                          <Upload className="w-4 h-4 mr-2" />
+                          Upload Products
+                        </DropdownMenuItem>
                         <DropdownMenuItem 
                           onClick={() => handleSyncVendor(vendor)}
                           disabled={syncVendorMutation.isPending}
@@ -407,6 +419,15 @@ export default function Vendors() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         vendor={editingVendor}
+      />
+
+      <FileUploadModal
+        vendor={uploadingVendor}
+        isOpen={isUploadModalOpen}
+        onClose={() => {
+          setIsUploadModalOpen(false);
+          setUploadingVendor(null);
+        }}
       />
     </div>
   );

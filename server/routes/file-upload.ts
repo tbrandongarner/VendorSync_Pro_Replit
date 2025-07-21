@@ -67,10 +67,37 @@ router.post('/vendor/:vendorId/upload', upload.single('file'), async (req: any, 
       return res.status(400).json({ error: 'Unsupported file type' });
     }
 
-    // Store parsed products temporarily (you might want to save these to database)
-    // For now, we'll return them to the client
+    // Filter valid products and store in database
     const validProducts = parsedProducts.filter(p => p.sku && p.name);
     const invalidProducts = parsedProducts.filter(p => !p.sku || !p.name);
+    const uploadBatch = `${vendorId}-${Date.now()}`;
+    
+    // Store uploaded products in database
+    const uploadedProductsData = validProducts.map(product => ({
+      vendorId: vendorId,
+      sku: product.sku,
+      name: product.name,
+      description: product.description || '',
+      price: product.price ? product.price.toString() : '0',
+      compareAtPrice: product.compareAtPrice ? product.compareAtPrice.toString() : null,
+      barcode: product.barcode || null,
+      inventory: product.inventory || 0,
+      category: product.category || null,
+      brand: vendor.name,
+      status: 'pending',
+      tags: product.tags ? JSON.stringify(product.tags) : null,
+      images: product.images ? JSON.stringify(product.images) : null,
+      variants: product.variants ? JSON.stringify(product.variants) : null,
+      uploadBatch: uploadBatch,
+    }));
+
+    // Clear previous uploaded products for this vendor
+    await storage.deleteUploadedProducts(vendorId);
+    
+    // Insert new uploaded products
+    if (uploadedProductsData.length > 0) {
+      await storage.createUploadedProducts(uploadedProductsData);
+    }
 
     res.json({
       success: true,

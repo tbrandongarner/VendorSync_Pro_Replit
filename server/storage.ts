@@ -3,6 +3,7 @@ import {
   stores,
   vendors,
   products,
+  uploadedProducts,
   syncJobs,
   activities,
   aiGenerations,
@@ -63,6 +64,12 @@ export interface IStorage {
   // AI generation operations
   getAiGenerations(userId: string, limit?: number): Promise<AiGeneration[]>;
   createAiGeneration(generation: InsertAiGeneration): Promise<AiGeneration>;
+  
+  // Uploaded products operations
+  getUploadedProducts(vendorId: number): Promise<any[]>;
+  createUploadedProducts(products: any[]): Promise<any[]>;
+  updateUploadedProduct(id: number, updates: any): Promise<any>;
+  deleteUploadedProducts(vendorId: number): Promise<void>;
   
   // Dashboard stats
   getDashboardStats(userId: string): Promise<{
@@ -250,6 +257,34 @@ export class DatabaseStorage implements IStorage {
   async createAiGeneration(generation: InsertAiGeneration): Promise<AiGeneration> {
     const [newGeneration] = await db.insert(aiGenerations).values(generation).returning();
     return newGeneration;
+  }
+
+  // Uploaded products operations
+  async getUploadedProducts(vendorId: number): Promise<any[]> {
+    return await db
+      .select()
+      .from(uploadedProducts)
+      .where(eq(uploadedProducts.vendorId, vendorId))
+      .orderBy(desc(uploadedProducts.createdAt));
+  }
+
+  async createUploadedProducts(products: any[]): Promise<any[]> {
+    if (products.length === 0) return [];
+    const insertedProducts = await db.insert(uploadedProducts).values(products).returning();
+    return insertedProducts;
+  }
+
+  async updateUploadedProduct(id: number, updates: any): Promise<any> {
+    const [updatedProduct] = await db
+      .update(uploadedProducts)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(uploadedProducts.id, id))
+      .returning();
+    return updatedProduct;
+  }
+
+  async deleteUploadedProducts(vendorId: number): Promise<void> {
+    await db.delete(uploadedProducts).where(eq(uploadedProducts.vendorId, vendorId));
   }
 
   // Dashboard stats

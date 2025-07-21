@@ -139,6 +139,30 @@ export const activities = pgTable("activities", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Table for uploaded product data from CSV/Excel before sync
+export const uploadedProducts = pgTable("uploaded_products", {
+  id: serial("id").primaryKey(),
+  vendorId: integer("vendor_id").notNull().references(() => vendors.id),
+  sku: varchar("sku").notNull(),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  price: decimal("price", { precision: 15, scale: 2 }),
+  compareAtPrice: decimal("compare_at_price", { precision: 15, scale: 2 }),
+  barcode: varchar("barcode"),
+  inventory: integer("inventory").default(0),
+  category: varchar("category"),
+  brand: varchar("brand"),
+  status: varchar("status").default("pending"), // pending, synced, failed
+  tags: jsonb("tags"),
+  images: jsonb("images"),
+  variants: jsonb("variants"),
+  syncedProductId: integer("synced_product_id").references(() => products.id), // Reference to synced product
+  syncError: text("sync_error"), // Store sync error if any
+  uploadBatch: varchar("upload_batch"), // Group products from same upload
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const aiGenerations = pgTable("ai_generations", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
