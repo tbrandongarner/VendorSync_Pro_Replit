@@ -14,7 +14,8 @@ import {
   Settings,
   Menu,
   X,
-  Upload
+  Upload,
+  DollarSign
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -29,6 +30,7 @@ export default function Sidebar() {
     { name: 'Uploaded Products', href: '/uploaded-products', icon: Upload },
     { name: 'Stores', href: '/stores', icon: Store },
     { name: 'Synchronization', href: '/sync', icon: FolderSync },
+    { name: 'Pricing Manager', href: '/pricing', icon: DollarSign },
     { name: 'AI Content', href: '/ai', icon: Bot },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Settings', href: '/settings', icon: Settings },

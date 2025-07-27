@@ -7,6 +7,8 @@ import {
   syncJobs,
   activities,
   aiGenerations,
+  pricingBatches,
+  pricingChanges,
   type User,
   type UpsertUser,
   type Store,
@@ -23,6 +25,10 @@ import {
   type InsertAiGeneration,
   type UploadedProduct,
   type InsertUploadedProduct,
+  type PricingBatch,
+  type InsertPricingBatch,
+  type PricingChange,
+  type InsertPricingChange,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, count } from "drizzle-orm";
@@ -74,6 +80,20 @@ export interface IStorage {
   createUploadedProducts(products: any[]): Promise<any[]>;
   updateUploadedProduct(id: number, updates: any): Promise<any>;
   deleteUploadedProducts(vendorId: number): Promise<void>;
+  
+  // Pricing batch operations
+  getPricingBatches(userId: string, vendorId?: number): Promise<PricingBatch[]>;
+  getPricingBatch(id: number): Promise<PricingBatch | undefined>;
+  createPricingBatch(batch: InsertPricingBatch): Promise<PricingBatch>;
+  updatePricingBatch(id: number, updates: Partial<InsertPricingBatch>): Promise<PricingBatch>;
+  deletePricingBatch(id: number): Promise<void>;
+  
+  // Pricing change operations
+  getPricingChanges(batchId: number): Promise<PricingChange[]>;
+  createPricingChanges(changes: InsertPricingChange[]): Promise<PricingChange[]>;
+  updatePricingChange(id: number, updates: Partial<InsertPricingChange>): Promise<PricingChange>;
+  applyPricingChanges(batchId: number): Promise<void>;
+  revertPricingChanges(batchId: number): Promise<void>;
   
   // Dashboard stats
   getDashboardStats(userId: string): Promise<{
@@ -340,6 +360,154 @@ export class DatabaseStorage implements IStorage {
       connectedStores: connectedStoresResult.count,
       aiGenerated: aiGeneratedResult.count,
     };
+  }
+
+  // Pricing batch operations
+  async getPricingBatches(userId: string, vendorId?: number): Promise<PricingBatch[]> {
+    if (vendorId) {
+      return await db
+        .select()
+        .from(pricingBatches)
+        .where(and(eq(pricingBatches.userId, userId), eq(pricingBatches.vendorId, vendorId)))
+        .orderBy(desc(pricingBatches.createdAt));
+    }
+    
+    return await db
+      .select()
+      .from(pricingBatches)
+      .where(eq(pricingBatches.userId, userId))
+      .orderBy(desc(pricingBatches.createdAt));
+  }
+
+  async getPricingBatch(id: number): Promise<PricingBatch | undefined> {
+    const [batch] = await db.select().from(pricingBatches).where(eq(pricingBatches.id, id));
+    return batch;
+  }
+
+  async createPricingBatch(batch: InsertPricingBatch): Promise<PricingBatch> {
+    const [newBatch] = await db.insert(pricingBatches).values(batch).returning();
+    return newBatch;
+  }
+
+  async updatePricingBatch(id: number, updates: Partial<InsertPricingBatch>): Promise<PricingBatch> {
+    const [updatedBatch] = await db
+      .update(pricingBatches)
+      .set(updates)
+      .where(eq(pricingBatches.id, id))
+      .returning();
+    return updatedBatch;
+  }
+
+  async deletePricingBatch(id: number): Promise<void> {
+    // Delete all associated pricing changes first
+    await db.delete(pricingChanges).where(eq(pricingChanges.batchId, id));
+    // Then delete the batch
+    await db.delete(pricingBatches).where(eq(pricingBatches.id, id));
+  }
+
+  // Pricing change operations
+  async getPricingChanges(batchId: number): Promise<PricingChange[]> {
+    return await db.select().from(pricingChanges).where(eq(pricingChanges.batchId, batchId));
+  }
+
+  async createPricingChanges(changes: InsertPricingChange[]): Promise<PricingChange[]> {
+    const newChanges = await db.insert(pricingChanges).values(changes).returning();
+    return newChanges;
+  }
+
+  async updatePricingChange(id: number, updates: Partial<InsertPricingChange>): Promise<PricingChange> {
+    const [updatedChange] = await db
+      .update(pricingChanges)
+      .set(updates)
+      .where(eq(pricingChanges.id, id))
+      .returning();
+    return updatedChange;
+  }
+
+  async applyPricingChanges(batchId: number): Promise<void> {
+    // Get all pending changes for this batch
+    const changes = await db
+      .select()
+      .from(pricingChanges)
+      .where(and(
+        eq(pricingChanges.batchId, batchId),
+        eq(pricingChanges.status, 'pending')
+      ));
+
+    // Apply each change to the products table
+    for (const change of changes) {
+      await db
+        .update(products)
+        .set({
+          price: change.newPrice,
+          compareAtPrice: change.newCompareAtPrice,
+          needsSync: true,
+          lastModifiedBy: 'pricing_update',
+          updatedAt: new Date(),
+        })
+        .where(eq(products.id, change.productId));
+
+      // Mark the change as applied
+      await db
+        .update(pricingChanges)
+        .set({
+          status: 'applied',
+          appliedAt: new Date(),
+        })
+        .where(eq(pricingChanges.id, change.id));
+    }
+
+    // Mark the batch as applied
+    await db
+      .update(pricingBatches)
+      .set({
+        status: 'applied',
+        appliedAt: new Date(),
+      })
+      .where(eq(pricingBatches.id, batchId));
+  }
+
+  async revertPricingChanges(batchId: number): Promise<void> {
+    // Get all applied changes for this batch
+    const changes = await db
+      .select()
+      .from(pricingChanges)
+      .where(and(
+        eq(pricingChanges.batchId, batchId),
+        eq(pricingChanges.status, 'applied')
+      ));
+
+    // Revert each change in the products table
+    for (const change of changes) {
+      await db
+        .update(products)
+        .set({
+          price: change.oldPrice,
+          compareAtPrice: change.oldCompareAtPrice,
+          needsSync: true,
+          lastModifiedBy: 'pricing_revert',
+          updatedAt: new Date(),
+        })
+        .where(eq(products.id, change.productId));
+
+      // Mark the change as reverted
+      await db
+        .update(pricingChanges)
+        .set({
+          status: 'reverted',
+          revertedAt: new Date(),
+        })
+        .where(eq(pricingChanges.id, change.id));
+    }
+
+    // Mark the batch as reverted
+    await db
+      .update(pricingBatches)
+      .set({
+        status: 'reverted',
+        revertedAt: new Date(),
+      })
+      .where(eq(pricingBatches.id, batchId));
   }
 }
 

@@ -733,6 +733,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Pricing management routes
+  app.get('/api/pricing/batches', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const vendorId = req.query.vendorId ? parseInt(req.query.vendorId as string) : undefined;
+      const batches = await storage.getPricingBatches(userId, vendorId);
+      res.json(batches);
+    } catch (error) {
+      console.error("Error fetching pricing batches:", error);
+      res.status(500).json({ message: "Failed to fetch pricing batches" });
+    }
+  });
+
+  app.post('/api/pricing/preview', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { pricingService } = await import('./services/pricing');
+      
+      const options = {
+        vendorId: req.body.vendorId,
+        priceChangeType: req.body.priceChangeType,
+        priceChangeValue: parseFloat(req.body.priceChangeValue),
+        compareAtPriceChange: req.body.compareAtPriceChange ? parseFloat(req.body.compareAtPriceChange) : undefined,
+        includeCompareAtPrice: req.body.includeCompareAtPrice || false,
+        reason: req.body.reason || 'Price update',
+        preview: true,
+        batchSize: req.body.batchSize ? parseInt(req.body.batchSize) : undefined,
+      };
+
+      const preview = await pricingService.calculatePricingChanges(userId, options);
+      res.json(preview);
+    } catch (error) {
+      console.error("Error creating pricing preview:", error);
+      res.status(500).json({ message: "Failed to create pricing preview" });
+    }
+  });
+
+  app.post('/api/pricing/batches', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { pricingService } = await import('./services/pricing');
+      
+      const options = {
+        vendorId: req.body.vendorId,
+        priceChangeType: req.body.priceChangeType,
+        priceChangeValue: parseFloat(req.body.priceChangeValue),
+        compareAtPriceChange: req.body.compareAtPriceChange ? parseFloat(req.body.compareAtPriceChange) : undefined,
+        includeCompareAtPrice: req.body.includeCompareAtPrice || false,
+        reason: req.body.reason || 'Price update',
+        preview: req.body.preview !== false,
+        batchSize: req.body.batchSize ? parseInt(req.body.batchSize) : undefined,
+      };
+
+      const result = await pricingService.createPricingBatch(
+        userId,
+        options,
+        req.body.name,
+        req.body.description
+      );
+
+      await storage.createActivity({
+        userId,
+        type: 'pricing_batch_created',
+        description: `Created pricing batch "${req.body.name}" with ${result.preview.changes.length} products`,
+        metadata: { batchId: result.batch.id, totalProducts: result.preview.changes.length }
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error creating pricing batch:", error);
+      res.status(500).json({ message: "Failed to create pricing batch" });
+    }
+  });
+
+  app.get('/api/pricing/batches/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const batchId = parseInt(req.params.id);
+      const { pricingService } = await import('./services/pricing');
+      
+      const details = await pricingService.getPricingBatchDetails(batchId);
+      res.json(details);
+    } catch (error) {
+      console.error("Error fetching pricing batch details:", error);
+      res.status(500).json({ message: "Failed to fetch pricing batch details" });
+    }
+  });
+
+  app.post('/api/pricing/batches/:id/apply', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const batchId = parseInt(req.params.id);
+      const { pricingService } = await import('./services/pricing');
+      
+      await pricingService.applyPricingBatch(batchId);
+
+      await storage.createActivity({
+        userId,
+        type: 'pricing_batch_applied',
+        description: `Applied pricing batch ${batchId}`,
+        metadata: { batchId }
+      });
+
+      res.json({ message: 'Pricing batch applied successfully' });
+    } catch (error) {
+      console.error("Error applying pricing batch:", error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to apply pricing batch" });
+    }
+  });
+
+  app.post('/api/pricing/batches/:id/revert', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const batchId = parseInt(req.params.id);
+      const { pricingService } = await import('./services/pricing');
+      
+      await pricingService.revertPricingBatch(batchId);
+
+      await storage.createActivity({
+        userId,
+        type: 'pricing_batch_reverted',
+        description: `Reverted pricing batch ${batchId}`,
+        metadata: { batchId }
+      });
+
+      res.json({ message: 'Pricing batch reverted successfully' });
+    } catch (error) {
+      console.error("Error reverting pricing batch:", error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to revert pricing batch" });
+    }
+  });
+
+  app.delete('/api/pricing/batches/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const batchId = parseInt(req.params.id);
+      
+      await storage.deletePricingBatch(batchId);
+
+      await storage.createActivity({
+        userId,
+        type: 'pricing_batch_deleted',
+        description: `Deleted pricing batch ${batchId}`,
+        metadata: { batchId }
+      });
+
+      res.json({ message: 'Pricing batch deleted successfully' });
+    } catch (error) {
+      console.error("Error deleting pricing batch:", error);
+      res.status(500).json({ message: "Failed to delete pricing batch" });
+    }
+  });
+
   // File upload routes
   app.use('/api/files', fileUploadRoutes);
   

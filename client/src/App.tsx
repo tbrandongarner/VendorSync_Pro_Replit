@@ -13,6 +13,7 @@ import Stores from "@/pages/stores";
 import SyncManager from "@/pages/sync-manager";
 import AiContent from "@/pages/ai-content";
 import Analytics from "@/pages/analytics";
+import PricingManager from "@/pages/pricing-manager";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/layout/sidebar";
@@ -42,6 +43,7 @@ function Router() {
           <Route path="/sync" component={SyncManager} />
           <Route path="/ai" component={AiContent} />
           <Route path="/analytics" component={Analytics} />
+          <Route path="/pricing" component={PricingManager} />
           <Route path="/settings" component={Settings} />
           <Route component={NotFound} />
         </Switch>

@@ -175,6 +175,35 @@ export const aiGenerations = pgTable("ai_generations", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const pricingBatches = pgTable("pricing_batches", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  vendorId: integer("vendor_id").references(() => vendors.id),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  status: varchar("status").default("preview"), // preview, applied, reverted
+  totalProducts: integer("total_products").default(0),
+  appliedAt: timestamp("applied_at"),
+  revertedAt: timestamp("reverted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const pricingChanges = pgTable("pricing_changes", {
+  id: serial("id").primaryKey(),
+  batchId: integer("batch_id").notNull().references(() => pricingBatches.id),
+  productId: integer("product_id").notNull().references(() => products.id),
+  oldPrice: decimal("old_price", { precision: 15, scale: 2 }),
+  newPrice: decimal("new_price", { precision: 15, scale: 2 }),
+  oldCompareAtPrice: decimal("old_compare_at_price", { precision: 15, scale: 2 }),
+  newCompareAtPrice: decimal("new_compare_at_price", { precision: 15, scale: 2 }),
+  priceChangePercent: decimal("price_change_percent", { precision: 5, scale: 2 }),
+  reason: varchar("reason"), // e.g., "vendor_update", "margin_adjustment", "promotion"
+  status: varchar("status").default("pending"), // pending, applied, reverted
+  appliedAt: timestamp("applied_at"),
+  revertedAt: timestamp("reverted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   stores: many(stores),
@@ -237,6 +266,29 @@ export const aiGenerationsRelations = relations(aiGenerations, ({ one }) => ({
   }),
   product: one(products, {
     fields: [aiGenerations.productId],
+    references: [products.id],
+  }),
+}));
+
+export const pricingBatchesRelations = relations(pricingBatches, ({ one, many }) => ({
+  user: one(users, {
+    fields: [pricingBatches.userId],
+    references: [users.id],
+  }),
+  vendor: one(vendors, {
+    fields: [pricingBatches.vendorId],
+    references: [vendors.id],
+  }),
+  changes: many(pricingChanges),
+}));
+
+export const pricingChangesRelations = relations(pricingChanges, ({ one }) => ({
+  batch: one(pricingBatches, {
+    fields: [pricingChanges.batchId],
+    references: [pricingBatches.id],
+  }),
+  product: one(products, {
+    fields: [pricingChanges.productId],
     references: [products.id],
   }),
 }));
@@ -312,6 +364,20 @@ export const insertUploadedProductSchema = createInsertSchema(uploadedProducts).
   updatedAt: true,
 });
 
+export const insertPricingBatchSchema = createInsertSchema(pricingBatches).omit({
+  id: true,
+  createdAt: true,
+  appliedAt: true,
+  revertedAt: true,
+});
+
+export const insertPricingChangeSchema = createInsertSchema(pricingChanges).omit({
+  id: true,
+  createdAt: true,
+  appliedAt: true,
+  revertedAt: true,
+});
+
 // Types
 export type UpsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -330,3 +396,7 @@ export type InsertAiGeneration = z.infer<typeof insertAiGenerationSchema>;
 export type AiGeneration = typeof aiGenerations.$inferSelect;
 export type InsertUploadedProduct = z.infer<typeof insertUploadedProductSchema>;
 export type UploadedProduct = typeof uploadedProducts.$inferSelect;
+export type InsertPricingBatch = z.infer<typeof insertPricingBatchSchema>;
+export type PricingBatch = typeof pricingBatches.$inferSelect;
+export type InsertPricingChange = z.infer<typeof insertPricingChangeSchema>;
+export type PricingChange = typeof pricingChanges.$inferSelect;
