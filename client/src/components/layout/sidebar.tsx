@@ -116,7 +116,7 @@ export default function Sidebar() {
           <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
             <div className="flex items-center space-x-3">
               <Avatar className="w-8 h-8">
-                <AvatarImage src={user?.profileImageUrl} alt={user?.firstName} />
+                <AvatarImage src={user?.profileImageUrl || undefined} alt={user?.firstName || undefined} />
                 <AvatarFallback className="bg-emerald-100 text-emerald-600 text-sm">
                   {user?.firstName?.[0]}{user?.lastName?.[0]}
                 </AvatarFallback>
