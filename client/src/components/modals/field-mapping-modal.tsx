@@ -129,7 +129,7 @@ export default function FieldMappingModal({ vendor, isOpen, onClose, onSuccess }
   const handleMappingChange = (field: keyof FieldMapping, value: string) => {
     setMapping(prev => ({
       ...prev,
-      [field]: value
+      [field]: value === "__skip__" ? "" : value
     }));
   };
 
@@ -274,14 +274,14 @@ export default function FieldMappingModal({ vendor, isOpen, onClose, onSuccess }
                     </Label>
                     <div className="flex items-center gap-2">
                       <Select
-                        value={mapping[field.key as keyof FieldMapping]}
+                        value={mapping[field.key as keyof FieldMapping] || "__skip__"}
                         onValueChange={(value) => handleMappingChange(field.key as keyof FieldMapping, value)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select column..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">-- Skip this field --</SelectItem>
+                          <SelectItem value="__skip__">-- Skip this field --</SelectItem>
                           {COMMON_COLUMN_NAMES.map((column) => (
                             <SelectItem key={column} value={column}>
                               {column}
