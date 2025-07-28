@@ -1,0 +1,6 @@
+Product Code,Product Name,Retail Price,Cost Price,MSRP,Stock Quantity,Product Category,Product Description,Barcode,Image URL
+TECH-001,Wireless Bluetooth Headphones,79.99,35.00,99.99,150,Electronics,Premium wireless headphones with noise cancellation and 20-hour battery life,123456789012,https://example.com/headphones.jpg
+TECH-002,USB-C Fast Charger,24.99,12.50,29.99,200,Electronics,65W USB-C fast charger compatible with laptops and smartphones,123456789013,https://example.com/charger.jpg
+HOME-001,Smart LED Bulb,19.99,8.00,24.99,100,Home & Garden,WiFi-enabled smart bulb with color changing capabilities,123456789014,https://example.com/bulb.jpg
+SPORT-001,Yoga Mat Premium,49.99,20.00,59.99,75,Sports & Fitness,Non-slip premium yoga mat with alignment guides,123456789015,https://example.com/yoga-mat.jpg
+TECH-003,Portable Power Bank,39.99,18.00,49.99,120,Electronics,10000mAh portable charger with dual USB outputs,123456789016,https://example.com/powerbank.jpg
