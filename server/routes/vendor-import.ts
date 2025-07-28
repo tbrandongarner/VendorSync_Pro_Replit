@@ -92,7 +92,7 @@ router.post('/vendor/:vendorId/import', upload.single('file'), isAuthenticated, 
           const resolution = conflictResolver.resolveConflicts(
             normalizedVendorData,
             existingProduct,
-            existingProduct.shopifyData
+            null // shopifyData will be handled separately
           );
           
           if (resolution.autoResolved) {
@@ -101,9 +101,7 @@ router.post('/vendor/:vendorId/import', upload.single('file'), isAuthenticated, 
               ...resolution.resolvedData,
               needsSync: true,
               lastModifiedBy: 'vendor_import',
-              vendorData: normalizedVendorData,
               lastVendorUpdate: new Date(),
-              conflictState: 'none',
             });
             
             updatedProducts++;
@@ -112,9 +110,7 @@ router.post('/vendor/:vendorId/import', upload.single('file'), isAuthenticated, 
             // Conflicts require user intervention
             await storage.updateProduct(existingProduct.id, {
               ...existingProduct,
-              vendorData: normalizedVendorData,
               lastVendorUpdate: new Date(),
-              conflictState: 'pending_resolution',
               needsSync: false, // Don't sync until conflicts are resolved
             });
             

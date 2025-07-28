@@ -6,15 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { Upload, FileText, CheckCircle, AlertCircle, RefreshCw, Settings, Info } from "lucide-react";
 
 interface FileUploadModalProps {
   vendor: any;
   isOpen: boolean;
   onClose: () => void;
+  onConfigureFields?: () => void;
 }
 
-export default function FileUploadModal({ vendor, isOpen, onClose }: FileUploadModalProps) {
+export default function FileUploadModal({ vendor, isOpen, onClose, onConfigureFields }: FileUploadModalProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadResults, setUploadResults] = useState<any>(null);
@@ -138,6 +139,49 @@ export default function FileUploadModal({ vendor, isOpen, onClose }: FileUploadM
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Field Mapping Status */}
+          {vendor && (
+            <Card className={vendor.dataSourceConfig ? "border-green-200 bg-green-50" : "border-yellow-200 bg-yellow-50"}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {vendor.dataSourceConfig ? (
+                      <>
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <div>
+                          <p className="font-medium text-green-800">Field mapping configured</p>
+                          <p className="text-sm text-green-600">Your data columns are mapped and ready for import</p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Info className="w-5 h-5 text-yellow-600" />
+                        <div>
+                          <p className="font-medium text-yellow-800">Field mapping not configured</p>
+                          <p className="text-sm text-yellow-600">Set up field mapping for accurate imports</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (onConfigureFields) {
+                        onClose();
+                        onConfigureFields();
+                      }
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Configure
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {!uploadResults && (
             <div
               className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${

@@ -7,12 +7,13 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import TopBar from "@/components/layout/top-bar";
 import VendorModal from "@/components/modals/vendor-modal";
 import FileUploadModal from "@/components/modals/file-upload-modal";
+import FieldMappingModal from "@/components/modals/field-mapping-modal";
 import { SyncStatusNotification } from "@/components/ui/sync-status-notification";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Users, Mail, Globe, MoreHorizontal, Phone, User, Headphones, DollarSign, RefreshCw, Upload } from "lucide-react";
+import { Plus, Search, Users, Mail, Globe, MoreHorizontal, Phone, User, Headphones, DollarSign, RefreshCw, Upload, Settings } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +29,8 @@ export default function Vendors() {
   const [searchTerm, setSearchTerm] = useState("");
   const [uploadingVendor, setUploadingVendor] = useState(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [mappingVendor, setMappingVendor] = useState(null);
+  const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
 
   // Query sync jobs to show real-time status
   const { data: syncJobs = [] } = useQuery({
@@ -327,6 +330,13 @@ export default function Vendors() {
                         <DropdownMenuItem onClick={() => handleEditVendor(vendor)}>
                           Edit
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          setMappingVendor(vendor);
+                          setIsMappingModalOpen(true);
+                        }}>
+                          <Settings className="w-4 h-4 mr-2" />
+                          Configure Fields
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleUploadFile(vendor)}>
                           <Upload className="w-4 h-4 mr-2" />
                           Upload Products
@@ -477,6 +487,25 @@ export default function Vendors() {
         onClose={() => {
           setIsUploadModalOpen(false);
           setUploadingVendor(null);
+        }}
+        onConfigureFields={() => {
+          setMappingVendor(uploadingVendor);
+          setIsMappingModalOpen(true);
+        }}
+      />
+
+      <FieldMappingModal
+        vendor={mappingVendor}
+        isOpen={isMappingModalOpen}
+        onClose={() => {
+          setIsMappingModalOpen(false);
+          setMappingVendor(null);
+        }}
+        onSuccess={() => {
+          toast({
+            title: "Field Mapping Updated",
+            description: "Your field mapping has been saved. You can now upload files with these settings.",
+          });
         }}
       />
     </div>
