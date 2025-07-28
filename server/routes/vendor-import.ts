@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { isAuthenticated } from '../replitAuth.js';
 import { storage } from '../storage.js';
-import { parseCSV, parseExcel } from '../services/file-parser.js';
+import { parseCSV, parseExcel, getExcelSheetNames } from '../services/file-parser.js';
 import { conflictResolver } from '../services/conflict-resolver.js';
 import multer from 'multer';
 
@@ -17,6 +17,7 @@ router.post('/vendor/:vendorId/import', upload.single('file'), isAuthenticated, 
 
     const vendorId = parseInt(req.params.vendorId);
     const importMode = req.body.importMode || 'both'; // new_only, update_existing, both
+    const selectedSheets = req.body.selectedSheets ? JSON.parse(req.body.selectedSheets) : undefined;
     
     const vendor = await storage.getVendor(vendorId);
     if (!vendor) {
@@ -45,7 +46,7 @@ router.post('/vendor/:vendorId/import', upload.single('file'), isAuthenticated, 
     if (fileExtension === 'csv' || req.file.mimetype.includes('csv')) {
       parsedProducts = await parseCSV(req.file.buffer, config);
     } else if (fileExtension === 'xlsx' || fileExtension === 'xls' || req.file.mimetype.includes('sheet')) {
-      parsedProducts = await parseExcel(req.file.buffer, config);
+      parsedProducts = await parseExcel(req.file.buffer, config, selectedSheets);
     } else {
       return res.status(400).json({ error: 'Unsupported file type' });
     }
@@ -180,6 +181,36 @@ router.post('/vendor/:vendorId/import', upload.single('file'), isAuthenticated, 
     console.error('Vendor import error:', error);
     res.status(500).json({ 
       error: 'Failed to import vendor data',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get Excel sheet names endpoint
+router.post('/excel/sheets', upload.single('file'), isAuthenticated, async (req: any, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const fileExtension = req.file.originalname.split('.').pop()?.toLowerCase();
+    
+    if (fileExtension !== 'xlsx' && fileExtension !== 'xls' && !req.file.mimetype.includes('sheet')) {
+      return res.status(400).json({ error: 'File must be an Excel file (.xlsx or .xls)' });
+    }
+
+    const sheetNames = getExcelSheetNames(req.file.buffer);
+    
+    res.json({
+      success: true,
+      sheetNames,
+      totalSheets: sheetNames.length
+    });
+
+  } catch (error) {
+    console.error('Excel sheet analysis error:', error);
+    res.status(500).json({ 
+      error: 'Failed to analyze Excel file',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }

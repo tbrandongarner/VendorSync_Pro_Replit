@@ -58,14 +58,30 @@ export async function parseCSV(buffer: Buffer, config: DataSourceConfig = {}): P
   });
 }
 
-export async function parseExcel(buffer: Buffer, config: DataSourceConfig = {}): Promise<ParsedProduct[]> {
+export async function parseExcel(buffer: Buffer, config: DataSourceConfig = {}, selectedSheets?: string[]): Promise<ParsedProduct[]> {
   const finalConfig = { ...DEFAULT_CONFIG, ...config };
   const workbook = XLSX.read(buffer, { type: 'buffer' });
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  const rows = XLSX.utils.sheet_to_json(sheet);
+  
+  // If no sheets specified, use all sheets
+  const sheetsToProcess = selectedSheets && selectedSheets.length > 0 
+    ? selectedSheets.filter(sheetName => workbook.SheetNames.includes(sheetName))
+    : [workbook.SheetNames[0]]; // Default to first sheet if none specified
+  
+  const allProducts: ParsedProduct[] = [];
+  
+  for (const sheetName of sheetsToProcess) {
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet);
+    const products = rows.map(row => mapRowToProduct(row, finalConfig)).filter(p => p.sku);
+    allProducts.push(...products);
+  }
 
-  return rows.map(row => mapRowToProduct(row, finalConfig)).filter(p => p.sku);
+  return allProducts;
+}
+
+export function getExcelSheetNames(buffer: Buffer): string[] {
+  const workbook = XLSX.read(buffer, { type: 'buffer' });
+  return workbook.SheetNames;
 }
 
 export async function parseGoogleSheets(url: string, config: DataSourceConfig = {}): Promise<ParsedProduct[]> {

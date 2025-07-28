@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, CheckCircle, AlertCircle, RefreshCw, Settings, Info } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Upload, FileText, CheckCircle, AlertCircle, RefreshCw, Settings, Info, FileSpreadsheet } from "lucide-react";
 
 interface FileUploadModalProps {
   vendor: any;
@@ -20,11 +21,52 @@ export default function FileUploadModal({ vendor, isOpen, onClose, onConfigureFi
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadResults, setUploadResults] = useState<any>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [availableSheets, setAvailableSheets] = useState<string[]>([]);
+  const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
+  const [showSheetSelection, setShowSheetSelection] = useState(false);
+
+  const analyzeSheetsMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch(`/api/files/excel/sheets`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to analyze Excel file');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setAvailableSheets(data.sheetNames);
+      setSelectedSheets([data.sheetNames[0]]); // Select first sheet by default
+      setShowSheetSelection(true);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Analysis Failed",
+        description: error.message || "Failed to analyze Excel file",
+        variant: "destructive",
+      });
+    }
+  });
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('file', file);
+      
+      // Add selected sheets for Excel files
+      if (selectedSheets.length > 0 && file.name.match(/\.(xlsx|xls)$/i)) {
+        formData.append('selectedSheets', JSON.stringify(selectedSheets));
+      }
       
       const response = await fetch(`/api/files/vendor/${vendor.id}/upload`, {
         method: 'POST',
@@ -90,7 +132,39 @@ export default function FileUploadModal({ vendor, isOpen, onClose, onConfigureFi
       return;
     }
     
-    uploadMutation.mutate(file);
+    setSelectedFile(file);
+    
+    // For Excel files, analyze sheets first
+    if (file.name.match(/\.(xlsx|xls)$/i)) {
+      analyzeSheetsMutation.mutate(file);
+    } else {
+      // For CSV files, upload directly
+      setShowSheetSelection(false);
+      uploadMutation.mutate(file);
+    }
+  };
+
+  const handleSheetToggle = (sheetName: string, checked: boolean) => {
+    if (checked) {
+      setSelectedSheets(prev => [...prev, sheetName]);
+    } else {
+      setSelectedSheets(prev => prev.filter(s => s !== sheetName));
+    }
+  };
+
+  const handleSelectAllSheets = () => {
+    setSelectedSheets(availableSheets);
+  };
+
+  const handleDeselectAllSheets = () => {
+    setSelectedSheets([]);
+  };
+
+  const handleProceedWithSheets = () => {
+    if (selectedFile && selectedSheets.length > 0) {
+      setShowSheetSelection(false);
+      uploadMutation.mutate(selectedFile);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -122,6 +196,10 @@ export default function FileUploadModal({ vendor, isOpen, onClose, onConfigureFi
   const handleClose = () => {
     setUploadResults(null);
     setIsDragOver(false);
+    setSelectedFile(null);
+    setAvailableSheets([]);
+    setSelectedSheets([]);
+    setShowSheetSelection(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -137,6 +215,76 @@ export default function FileUploadModal({ vendor, isOpen, onClose, onConfigureFi
             Upload a CSV or Excel file containing product data to sync with Shopify
           </DialogDescription>
         </DialogHeader>
+        
+        {showSheetSelection && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5" />
+                Select Excel Sheets
+              </CardTitle>
+              <CardDescription>
+                Choose which sheets to import from "{selectedFile?.name}". 
+                You can select multiple sheets to combine their data.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleSelectAllSheets}
+                  disabled={selectedSheets.length === availableSheets.length}
+                >
+                  Select All
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleDeselectAllSheets}
+                  disabled={selectedSheets.length === 0}
+                >
+                  Deselect All
+                </Button>
+              </div>
+              
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {availableSheets.map((sheetName) => (
+                  <div key={sheetName} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`sheet-${sheetName}`}
+                      checked={selectedSheets.includes(sheetName)}
+                      onCheckedChange={(checked) => handleSheetToggle(sheetName, checked as boolean)}
+                    />
+                    <label 
+                      htmlFor={`sheet-${sheetName}`} 
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      {sheetName}
+                    </label>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="flex justify-between items-center pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  {selectedSheets.length} of {availableSheets.length} sheets selected
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setShowSheetSelection(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleProceedWithSheets}
+                    disabled={selectedSheets.length === 0}
+                  >
+                    Import Selected Sheets
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="space-y-6">
           {/* Field Mapping Status */}

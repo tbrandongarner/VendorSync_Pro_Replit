@@ -110,4 +110,31 @@ If something doesn't work:
 3. **Check required fields** - SKU, Name, and Price must be mapped
 4. **Review Shopify connection** - Ensure store is properly connected
 
+## NEW: Excel Sheet Selection Feature
+
+**📊 Multi-Sheet Excel Support**: Upload Excel files and choose specific sheets!
+
+### Testing Multi-Sheet Excel:
+1. **Use the new test file**: `test-vendor-products-multi-sheet.xlsx`
+   - Electronics sheet: 3 tech products
+   - Home & Garden sheet: 3 home products  
+   - Sports & Fitness sheet: 3 fitness products
+
+2. **Upload Process**:
+   - Select the Excel file → System analyzes all sheets
+   - Choose sheets: Select one, multiple, or all sheets
+   - Import proceeds with selected data combined
+
+3. **Sheet Selection Options**:
+   - **Select All**: Import all sheets at once
+   - **Individual Selection**: Pick specific sheets (e.g., just Electronics)
+   - **Multiple Selection**: Combine data from chosen sheets
+
+### Examples to Try:
+- **Single Sheet**: Import just "Electronics" sheet (3 products)
+- **Multiple Sheets**: Import "Electronics" + "Home & Garden" (6 products)
+- **All Sheets**: Import all 3 sheets (9 products total)
+
+The system seamlessly combines data from multiple sheets while maintaining proper field mapping and validation. Perfect for vendors with organized product catalogs by category!
+
 The system is designed to be intuitive and provide clear feedback at every step. Try the demo and see how easy it is to import vendor data!

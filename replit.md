@@ -26,6 +26,12 @@ VendorSync Pro is a comprehensive vendor management platform for Shopify that co
 - Created quick presets for Shopify, basic, and wholesale data formats
 - Enhanced file upload modal with real-time validation and progress tracking
 - Added comprehensive documentation and demo files for testing
+- **NEW FEATURE (July 28, 2025):** Added Excel sheet selection functionality
+- Created multi-sheet Excel upload support with sheet analysis endpoint
+- Added visual sheet selection interface with checkboxes and bulk selection
+- Implemented smart sheet processing that combines data from selected sheets
+- Enhanced file parser to handle multiple Excel sheets with selectedSheets parameter
+- Created test file with 3 sheets (Electronics, Home & Garden, Sports & Fitness)
 - **COMPLETE (July 20, 2025):** Built comprehensive product editing system
 - Added edit buttons to all product views (cards, list, grid) with visual sync indicators
 - Created full-featured product edit dialog with form validation
