@@ -185,6 +185,64 @@ export class ProductSyncService {
 
           console.log(`Total products found for vendor ${vendor.name}: ${allProducts.length}`);
 
+          // Collect all inventory item IDs for batch cost retrieval
+          const inventoryItemIds: string[] = [];
+          const inventoryItemMap: Map<string, { sku: string; productIndex: number }> = new Map();
+          
+          allProducts.forEach((product, index) => {
+            const primaryVariant = product.variants?.[0];
+            if (primaryVariant?.inventory_item_id) {
+              const inventoryItemId = primaryVariant.inventory_item_id.toString();
+              inventoryItemIds.push(inventoryItemId);
+              inventoryItemMap.set(inventoryItemId, {
+                sku: primaryVariant.sku || `shopify-${product.id}`,
+                productIndex: index
+              });
+            }
+          });
+
+          // Batch fetch inventory items for cost prices
+          const inventoryCosts: Map<string, string> = new Map();
+          if (inventoryItemIds.length > 0) {
+            console.log(`Fetching cost data for ${inventoryItemIds.length} inventory items`);
+            
+            // Process in batches of 250 (Shopify API limit)
+            const batchSize = 250;
+            for (let i = 0; i < inventoryItemIds.length; i += batchSize) {
+              const batchIds = inventoryItemIds.slice(i, i + batchSize);
+              const idsParam = batchIds.join(',');
+              
+              try {
+                const inventoryUrl = `https://${shopifyDomain}/admin/api/2023-10/inventory_items.json?ids=${idsParam}`;
+                const inventoryResponse = await fetch(inventoryUrl, {
+                  headers: {
+                    'X-Shopify-Access-Token': accessToken,
+                    'Content-Type': 'application/json'
+                  }
+                });
+                
+                if (inventoryResponse.ok) {
+                  const inventoryData = await inventoryResponse.json();
+                  if (inventoryData.inventory_items) {
+                    inventoryData.inventory_items.forEach((item: any) => {
+                      if (item.cost && parseFloat(item.cost) > 0) {
+                        inventoryCosts.set(item.id.toString(), item.cost);
+                        const itemInfo = inventoryItemMap.get(item.id.toString());
+                        if (itemInfo) {
+                          console.log(`Retrieved cost price for ${itemInfo.sku}: $${item.cost}`);
+                        }
+                      }
+                    });
+                  }
+                } else {
+                  console.warn(`Failed to fetch inventory batch ${i}-${i+batchSize}: ${inventoryResponse.status}`);
+                }
+              } catch (batchError) {
+                console.warn(`Error fetching inventory batch ${i}-${i+batchSize}:`, batchError);
+              }
+            }
+          }
+
           // Process each product
           for (const shopifyProduct of allProducts) {
             try {
@@ -193,26 +251,10 @@ export class ProductSyncService {
               const sku = primaryVariant?.sku || `shopify-${shopifyProduct.id}`;
               const upc = primaryVariant?.barcode || null; // UPC from variant barcode
               
-              // Fetch cost price from inventory item API if inventory_item_id is available
+              // Get cost price from the batch fetched data
               let costPrice: string | null = null;
               if (primaryVariant?.inventory_item_id) {
-                try {
-                  const inventoryUrl = `https://${shopifyDomain}/admin/api/2023-10/inventory_items/${primaryVariant.inventory_item_id}.json`;
-                  const inventoryResponse = await fetch(inventoryUrl, {
-                    headers: {
-                      'X-Shopify-Access-Token': accessToken,
-                      'Content-Type': 'application/json'
-                    }
-                  });
-                  
-                  if (inventoryResponse.ok) {
-                    const inventoryData = await inventoryResponse.json();
-                    costPrice = inventoryData.inventory_item?.cost || null;
-                    console.log(`Retrieved cost price for ${sku}: ${costPrice}`);
-                  }
-                } catch (costError) {
-                  console.warn(`Could not fetch cost for ${sku}:`, costError);
-                }
+                costPrice = inventoryCosts.get(primaryVariant.inventory_item_id.toString()) || null;
               }
 
               // Prepare variant data for storage
