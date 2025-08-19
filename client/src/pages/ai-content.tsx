@@ -611,20 +611,48 @@ export default function AiContent() {
                       {/* Main Description */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <Label className="text-base font-semibold">Marketing Description</Label>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copyToClipboard(generatedMarketing.description)}
-                          >
-                            <Copy className="w-4 h-4" />
-                          </Button>
+                          <Label className="text-base font-semibold">Professional Marketing Content</Label>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copyToClipboard(generatedMarketing.description)}
+                              title="Copy HTML version"
+                            >
+                              <Copy className="w-4 h-4 mr-1" />
+                              HTML
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copyToClipboard(generatedMarketing.description.replace(/<[^>]*>/g, ''))}
+                              title="Copy text only"
+                            >
+                              <Copy className="w-4 h-4 mr-1" />
+                              Text
+                            </Button>
+                          </div>
                         </div>
-                        <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                          <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                            {generatedMarketing.description}
-                          </p>
+                        
+                        {/* Formatted Preview */}
+                        <div className="p-4 bg-white rounded-lg border shadow-sm max-h-96 overflow-y-auto">
+                          <div 
+                            className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-h2:text-lg prose-h2:font-bold prose-h2:mb-3 prose-h2:mt-4 prose-h3:text-base prose-h3:font-semibold prose-h3:mb-2 prose-h3:mt-3 prose-p:text-gray-700 prose-p:leading-relaxed"
+                            dangerouslySetInnerHTML={{ __html: generatedMarketing.description }}
+                          />
                         </div>
+                        
+                        {/* Raw HTML Code */}
+                        <details className="mt-2">
+                          <summary className="text-xs text-gray-600 cursor-pointer hover:text-gray-800">
+                            View HTML Source Code
+                          </summary>
+                          <div className="mt-2 p-3 bg-gray-50 rounded border text-xs font-mono max-h-48 overflow-y-auto">
+                            <code className="text-gray-800 whitespace-pre-wrap">
+                              {generatedMarketing.description}
+                            </code>
+                          </div>
+                        </details>
                       </div>
 
                       {/* Key Benefits */}

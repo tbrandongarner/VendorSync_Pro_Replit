@@ -138,7 +138,7 @@ export async function generateMarketingDescription(request: ProductDescriptionRe
     const frameworkInstructions = getFrameworkInstructions(request.framework);
     
     const prompt = `
-You are a world-class e-commerce copywriter and marketing expert. Generate a compelling product description using the ${request.framework} marketing framework.
+You are a world-class e-commerce copywriter and marketing expert. Generate a comprehensive, professionally formatted product description using the ${request.framework} marketing framework.
 
 PRODUCT INFORMATION:
 - Name: ${request.productName}
@@ -158,31 +158,61 @@ PRODUCT INFORMATION:
 FRAMEWORK: ${request.framework}
 ${frameworkInstructions}
 
-INSTRUCTIONS:
-- Prominently feature the primary keyword "${request.primaryKeyword || 'the product name'}" throughout the description
+FORMATTING REQUIREMENTS:
+Create a structured, professional product description using HTML headers and sections like top-selling e-commerce products:
+
+1. **Introduction Section** (H2): Compelling opening paragraph that hooks the customer
+2. **Key Features** (H2): Main product features with H3 subsections for major features
+3. **Benefits & Use Cases** (H2): How the product solves problems and real-world applications
+4. **Technical Specifications** (H2): Detailed specs in an organized format
+5. **Why Choose This Product** (H2): Competitive advantages and unique selling points
+6. **Customer Promise** (H2): Guarantees, warranties, or satisfaction promises
+
+CONTENT INSTRUCTIONS:
+- Use HTML headers: <h2> for main sections, <h3> for subsections
+- Include the primary keyword "${request.primaryKeyword || 'the product name'}" in headers and throughout
 - Naturally incorporate the secondary keyword "${request.secondaryKeyword || ''}" where relevant
-- Use the technical specifications to add credibility and detail
-- Create a description that balances emotional appeal with factual information
-- Ensure the content flows logically following the ${request.framework} framework
+- Create scannable content with proper formatting
+- Balance emotional appeal with factual information
+- Follow the ${request.framework} framework structure
+- Use professional, conversion-focused language
 
 Generate a response in JSON format:
 {
-  "description": "Complete marketing-focused product description (300-400 words) using the ${request.framework} framework with keywords optimally placed",
+  "description": "Complete HTML-formatted product description (500-700 words) with proper H2/H3 headers and structured sections",
   "framework": "${request.framework}",
-  "bullets": ["6-8 compelling bullet points highlighting key benefits and features"],
+  "bullets": ["8-10 compelling bullet points highlighting key benefits and features"],
   "cta": "Strong call-to-action phrase that creates urgency",
-  "seoKeywords": ["12-18 SEO-optimized keywords including primary/secondary keywords and product-specific terms"]
+  "seoKeywords": ["15-20 SEO-optimized keywords including primary/secondary keywords and product-specific terms"]
 }
 
+EXAMPLE STRUCTURE:
+<h2>Revolutionary [Product Name] - Transform Your [Use Case]</h2>
+<p>Opening paragraph with emotional hook and primary keyword...</p>
+
+<h2>Key Features</h2>
+<h3>Advanced [Feature Name]</h3>
+<p>Feature description...</p>
+
+<h2>Benefits & Use Cases</h2>
+<p>How this product improves your life...</p>
+
+<h2>Technical Specifications</h2>
+<p>Detailed specs in readable format...</p>
+
+<h2>Why Choose [Product Name]</h2>
+<p>Competitive advantages...</p>
+
+<h2>Your Satisfaction Guaranteed</h2>
+<p>Warranties, guarantees, customer support...</p>
+
 Requirements:
-- Use persuasive, conversion-focused language
-- Include emotional triggers and urgency where appropriate
-- Focus on customer benefits while highlighting technical specifications
-- Make it scannable with good flow and rhythm
-- Naturally integrate provided keywords for SEO optimization
-- Incorporate social proof elements if possible
-- Ensure the description follows the chosen marketing framework structure
-- Balance technical details with emotional appeal
+- Professional HTML formatting with proper headers
+- Structured sections like premium e-commerce products
+- Conversion-focused language with emotional triggers
+- SEO-optimized with natural keyword integration
+- Scannable format with clear hierarchy
+- Technical credibility balanced with benefits
 `;
 
     const response = await openai.chat.completions.create({
