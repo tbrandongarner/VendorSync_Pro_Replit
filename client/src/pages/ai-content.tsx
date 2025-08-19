@@ -15,7 +15,42 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Bot, Sparkles, Copy, RefreshCw, History, CheckCircle, Package, Edit3, Send, Eye } from "lucide-react";
-import type { GeneratedContent, Product, Vendor } from "@/types";
+import type { GeneratedContent } from "@/types";
+
+type Product = {
+  id: number;
+  vendorId: number;
+  storeId: number;
+  name: string;
+  sku: string;
+  description?: string;
+  price?: string;
+  cost?: string;
+  msrp?: string;
+  quantity?: number;
+  upc?: string;
+  tags?: string[];
+  images?: string[];
+  variants?: any[];
+  shopifyId?: string;
+  lastSyncAt?: string;
+  needsSync?: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type Vendor = {
+  id: number;
+  userId: string;
+  name: string;
+  contactEmail?: string;
+  contactName?: string;
+  apiUrl?: string;
+  apiKey?: string;
+  logoUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export default function AiContent() {
   const { isAuthenticated } = useAuth();
@@ -40,8 +75,17 @@ export default function AiContent() {
   const [targetAudience, setTargetAudience] = useState("");
   const [brandVoice, setBrandVoice] = useState("professional");
   const [generatedMarketing, setGeneratedMarketing] = useState<any>(null);
-  const [showProductDialog, setShowProductDialog] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
+  
+  // Product search and details state
+  const [productSearch, setProductSearch] = useState('');
+  const [productDetails, setProductDetails] = useState({
+    customName: '',
+    primaryKeyword: '',
+    secondaryKeyword: '',
+    features: '',
+    specs: ''
+  });
 
   const { data: aiGenerations = [] } = useQuery({
     queryKey: ["/api/ai/generations"],
@@ -220,6 +264,13 @@ export default function AiContent() {
     generateDescriptionMutation.mutate(descriptionForm);
   };
 
+  // Filter products based on search
+  const filteredProducts = products.filter((product: Product) =>
+    product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+    product.sku.toLowerCase().includes(productSearch.toLowerCase()) ||
+    getVendorName(product.vendorId).toLowerCase().includes(productSearch.toLowerCase())
+  );
+
   const handleGenerateMarketing = () => {
     if (!selectedProduct) {
       toast({
@@ -232,10 +283,17 @@ export default function AiContent() {
 
     const vendor = vendors.find((v: Vendor) => v.id === selectedProduct.vendorId);
     
+    // Use custom details if provided, otherwise fall back to product data
+    const productName = productDetails.customName || selectedProduct.name;
+    const features = productDetails.features || extractFeatures(selectedProduct);
+    
     const marketingData = {
-      productName: selectedProduct.name,
+      productName,
       currentDescription: selectedProduct.description,
-      features: extractFeatures(selectedProduct),
+      features,
+      primaryKeyword: productDetails.primaryKeyword,
+      secondaryKeyword: productDetails.secondaryKeyword,
+      specs: productDetails.specs,
       targetAudience,
       framework: marketingFramework,
       brandVoice,
@@ -315,18 +373,34 @@ export default function AiContent() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Product Search */}
+                  <div className="space-y-2">
+                    <Label>Search Products</Label>
+                    <Input
+                      placeholder="Search by product name, SKU, or vendor..."
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
+
                   {/* Product Selection */}
                   <div className="space-y-3">
                     <Label>Select Product</Label>
                     <div className="max-h-48 overflow-y-auto border rounded-lg">
-                      {products.length === 0 ? (
+                      {filteredProducts.length === 0 ? (
                         <div className="p-4 text-center text-gray-500">
                           <Package className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                          <p>No products found. Sync some products first.</p>
+                          <p>
+                            {productSearch 
+                              ? `No products found matching "${productSearch}"`
+                              : "No products found. Sync some products first."
+                            }
+                          </p>
                         </div>
                       ) : (
                         <div className="space-y-2 p-2">
-                          {products.map((product: Product) => (
+                          {filteredProducts.map((product: Product) => (
                             <div
                               key={product.id}
                               className={`p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -358,6 +432,70 @@ export default function AiContent() {
                       )}
                     </div>
                   </div>
+
+                  {/* Product Details Customization */}
+                  {selectedProduct && (
+                    <div className="space-y-4 p-4 bg-gray-50 rounded-lg border">
+                      <Label className="text-sm font-medium text-gray-700">
+                        Customize Product Details (Optional)
+                      </Label>
+                      
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Product Name</Label>
+                          <Input
+                            placeholder={selectedProduct.name}
+                            value={productDetails.customName}
+                            onChange={(e) => setProductDetails(prev => ({ ...prev, customName: e.target.value }))}
+                            className="text-sm"
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Primary Keyword</Label>
+                            <Input
+                              placeholder="Main keyword..."
+                              value={productDetails.primaryKeyword}
+                              onChange={(e) => setProductDetails(prev => ({ ...prev, primaryKeyword: e.target.value }))}
+                              className="text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Secondary Keyword</Label>
+                            <Input
+                              placeholder="Secondary keyword..."
+                              value={productDetails.secondaryKeyword}
+                              onChange={(e) => setProductDetails(prev => ({ ...prev, secondaryKeyword: e.target.value }))}
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <Label className="text-xs">Key Features</Label>
+                          <Textarea
+                            placeholder="List key features, benefits, and highlights..."
+                            value={productDetails.features}
+                            onChange={(e) => setProductDetails(prev => ({ ...prev, features: e.target.value }))}
+                            rows={2}
+                            className="text-sm"
+                          />
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <Label className="text-xs">Specifications</Label>
+                          <Textarea
+                            placeholder="Technical specs, dimensions, materials..."
+                            value={productDetails.specs}
+                            onChange={(e) => setProductDetails(prev => ({ ...prev, specs: e.target.value }))}
+                            rows={2}
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Marketing Framework Selection */}
                   <div className="space-y-2">

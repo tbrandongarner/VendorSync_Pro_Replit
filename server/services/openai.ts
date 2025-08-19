@@ -139,9 +139,12 @@ You are a world-class e-commerce copywriter and marketing expert. Generate a com
 
 PRODUCT INFORMATION:
 - Name: ${request.productName}
+- Vendor: ${request.vendorName || 'Not specified'}
 - Current Description: ${request.currentDescription || 'None provided'}
 - Key Features: ${request.features || 'Extract from current description'}
-- Benefits: ${request.benefits || 'Derive from features'}
+- Primary Keyword: ${request.primaryKeyword || 'Not specified'}
+- Secondary Keyword: ${request.secondaryKeyword || 'Not specified'}
+- Technical Specifications: ${request.specs || 'Not specified'}
 - Target Audience: ${request.targetAudience || 'General consumers'}
 - Brand Voice: ${request.brandVoice || 'Professional and persuasive'}
 - Price: ${request.price || 'Not specified'}
@@ -152,22 +155,31 @@ PRODUCT INFORMATION:
 FRAMEWORK: ${request.framework}
 ${frameworkInstructions}
 
+INSTRUCTIONS:
+- Prominently feature the primary keyword "${request.primaryKeyword || 'the product name'}" throughout the description
+- Naturally incorporate the secondary keyword "${request.secondaryKeyword || ''}" where relevant
+- Use the technical specifications to add credibility and detail
+- Create a description that balances emotional appeal with factual information
+- Ensure the content flows logically following the ${request.framework} framework
+
 Generate a response in JSON format:
 {
-  "description": "Complete marketing-focused product description (250-350 words) using the ${request.framework} framework",
+  "description": "Complete marketing-focused product description (300-400 words) using the ${request.framework} framework with keywords optimally placed",
   "framework": "${request.framework}",
-  "bullets": ["5-7 compelling bullet points highlighting key benefits"],
-  "cta": "Strong call-to-action phrase",
-  "seoKeywords": ["10-15 SEO-optimized keywords for this product"]
+  "bullets": ["6-8 compelling bullet points highlighting key benefits and features"],
+  "cta": "Strong call-to-action phrase that creates urgency",
+  "seoKeywords": ["12-18 SEO-optimized keywords including primary/secondary keywords and product-specific terms"]
 }
 
 Requirements:
 - Use persuasive, conversion-focused language
 - Include emotional triggers and urgency where appropriate
-- Focus on customer benefits, not just features
+- Focus on customer benefits while highlighting technical specifications
 - Make it scannable with good flow and rhythm
+- Naturally integrate provided keywords for SEO optimization
 - Incorporate social proof elements if possible
 - Ensure the description follows the chosen marketing framework structure
+- Balance technical details with emotional appeal
 `;
 
     const response = await openai.chat.completions.create({
