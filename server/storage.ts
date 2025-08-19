@@ -41,6 +41,7 @@ export interface IStorage {
   
   // Store operations
   getStores(userId: string): Promise<Store[]>;
+  getStoresByUser(userId: string): Promise<Store[]>;
   getStore(id: number): Promise<Store | undefined>;
   createStore(store: InsertStore): Promise<Store>;
   updateStore(id: number, updates: Partial<InsertStore>): Promise<Store>;
@@ -57,6 +58,7 @@ export interface IStorage {
   getProducts(vendorId?: number, storeId?: number): Promise<Product[]>;
   getProduct(id: number): Promise<Product | undefined>;
   getProductBySku(sku: string): Promise<Product | undefined>;
+  getProductByShopifyId(shopifyId: string): Promise<Product | undefined>;
   getProductsByVendor(vendorId: number): Promise<Product[]>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, updates: Partial<Product>): Promise<Product>;
@@ -210,6 +212,15 @@ export class DatabaseStorage implements IStorage {
   async getProductBySku(sku: string): Promise<Product | undefined> {
     const [product] = await db.select().from(products).where(eq(products.sku, sku));
     return product;
+  }
+
+  async getProductByShopifyId(shopifyId: string): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.shopifyId, shopifyId));
+    return product;
+  }
+
+  async getStoresByUser(userId: string): Promise<Store[]> {
+    return await db.select().from(stores).where(eq(stores.userId, userId)).orderBy(desc(stores.createdAt));
   }
 
   async getProductsByVendor(vendorId: number): Promise<Product[]> {

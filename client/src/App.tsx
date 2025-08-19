@@ -11,6 +11,7 @@ import Products from "@/pages/products";
 import UploadedProducts from "@/pages/uploaded-products";
 import Stores from "@/pages/stores";
 import SyncManager from "@/pages/sync-manager";
+import BulkSync from "@/pages/bulk-sync";
 import AiContent from "@/pages/ai-content";
 import Analytics from "@/pages/analytics";
 import PricingManager from "@/pages/pricing-manager";
@@ -41,6 +42,7 @@ function Router() {
           <Route path="/uploaded-products" component={UploadedProducts} />
           <Route path="/stores" component={Stores} />
           <Route path="/sync" component={SyncManager} />
+          <Route path="/bulk-sync" component={BulkSync} />
           <Route path="/ai" component={AiContent} />
           <Route path="/analytics" component={Analytics} />
           <Route path="/pricing" component={PricingManager} />

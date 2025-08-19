@@ -9,6 +9,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { generateProductContent, generateProductDescription, generateMarketingDescription } from "./services/openai";
 import { initWebSocketService, getWebSocketService } from "./services/websocket";
 import { upload, ImageManager } from "./services/imageManager";
+import { BulkSyncService } from "./services/bulkSync";
 import { insertVendorSchema, insertStoreSchema, insertProductSchema, updateProductSchema } from "@shared/schema";
 import fileUploadRoutes from "./routes/file-upload";
 
@@ -1130,6 +1131,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // File upload routes
   app.use('/api/files', fileUploadRoutes);
+
+  // Bulk sync routes
+  app.post("/api/sync/bulk-from-shopify", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { storeId } = req.body;
+      
+      console.log(`Starting bulk sync for user ${userId}, store ${storeId || 'all'}`);
+      
+      const bulkSyncService = new BulkSyncService();
+      
+      // Start the sync in background
+      setImmediate(async () => {
+        try {
+          await bulkSyncService.syncAllFromShopify(userId, storeId);
+        } catch (error) {
+          console.error("Bulk sync error:", error);
+        }
+      });
+      
+      res.json({ 
+        message: "Bulk sync started", 
+        progress: bulkSyncService.getProgress()
+      });
+    } catch (error) {
+      console.error("Error starting bulk sync:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to start bulk sync" 
+      });
+    }
+  });
+
+  app.get("/api/sync/bulk-progress", isAuthenticated, async (req: any, res) => {
+    try {
+      // This would typically get progress from a stored state or cache
+      // For now, return a simple response
+      res.json({ 
+        message: "Use WebSocket connection for real-time progress updates",
+        status: "Check WebSocket messages for bulk_sync_progress events"
+      });
+    } catch (error) {
+      console.error("Error getting bulk sync progress:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to get progress" 
+      });
+    }
+  });
   
   // Vendor import routes
   const { default: vendorImportRoutes } = await import('./routes/vendor-import.js');
