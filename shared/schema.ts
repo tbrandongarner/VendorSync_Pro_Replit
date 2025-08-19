@@ -105,6 +105,7 @@ export const products = pgTable("products", {
   status: varchar("status").default("active"), // active, archived, draft
   tags: jsonb("tags"),
   images: jsonb("images"),
+  primaryImage: varchar("primary_image"),
   variants: jsonb("variants"),
   isActive: boolean("is_active").default(true),
   lastSyncAt: timestamp("last_sync_at"),

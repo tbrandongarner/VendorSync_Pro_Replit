@@ -61,6 +61,7 @@ export interface IStorage {
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, updates: Partial<Product>): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
+  updateProductImages(id: number, images: string[], primaryImage?: string | null): Promise<Product>;
   
   // Sync job operations
   getSyncJobs(vendorId?: number): Promise<SyncJob[]>;
@@ -233,6 +234,19 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProduct(id: number): Promise<void> {
     await db.delete(products).where(eq(products.id, id));
+  }
+
+  async updateProductImages(id: number, images: string[], primaryImage?: string | null): Promise<Product> {
+    const [product] = await db
+      .update(products)
+      .set({ 
+        images: images,
+        primaryImage: primaryImage || images[0] || null,
+        updatedAt: new Date()
+      })
+      .where(eq(products.id, id))
+      .returning();
+    return product;
   }
 
   async deleteAllProducts(): Promise<void> {

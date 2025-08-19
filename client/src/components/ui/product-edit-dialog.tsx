@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ProductImageGallery } from "@/components/ui/product-image-gallery";
 import { AlertTriangle, Save, X } from "lucide-react";
 
 interface ProductEditDialogProps {
@@ -16,9 +18,10 @@ interface ProductEditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (data: UpdateProduct) => Promise<void>;
+  onRefresh?: () => void;
 }
 
-export function ProductEditDialog({ product, open, onOpenChange, onSave }: ProductEditDialogProps) {
+export function ProductEditDialog({ product, open, onOpenChange, onSave, onRefresh }: ProductEditDialogProps) {
   const [isSaving, setIsSaving] = useState(false);
   
   const form = useForm<UpdateProduct>({
@@ -51,7 +54,7 @@ export function ProductEditDialog({ product, open, onOpenChange, onSave }: Produ
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             Edit Product
@@ -67,8 +70,15 @@ export function ProductEditDialog({ product, open, onOpenChange, onSave }: Produ
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSave)} className="space-y-6">
+        <Tabs defaultValue="details" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="details">Product Details</TabsTrigger>
+            <TabsTrigger value="images">Images</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="details" className="space-y-6">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSave)} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               {/* Product Name */}
               <FormField
@@ -265,18 +275,27 @@ export function ProductEditDialog({ product, open, onOpenChange, onSave }: Produ
               </div>
             </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                <X className="w-4 h-4 mr-2" />
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSaving}>
-                <Save className="w-4 h-4 mr-2" />
-                {isSaving ? "Saving..." : "Save Changes"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                    <X className="w-4 h-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isSaving}>
+                    <Save className="w-4 h-4 mr-2" />
+                    {isSaving ? "Saving..." : "Save Changes"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </TabsContent>
+          
+          <TabsContent value="images" className="space-y-6">
+            <ProductImageGallery 
+              product={product} 
+              onUpdate={() => onRefresh?.()} 
+            />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

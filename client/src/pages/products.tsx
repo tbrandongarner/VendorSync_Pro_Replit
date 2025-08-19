@@ -540,6 +540,9 @@ export default function Products() {
             open={!!editProduct}
             onOpenChange={(open) => !open && setEditProduct(null)}
             onSave={handleSaveProduct}
+            onRefresh={() => {
+              queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+            }}
           />
         )}
       </div>
