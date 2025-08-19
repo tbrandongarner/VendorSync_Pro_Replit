@@ -37,6 +37,10 @@ type Product = {
   needsSync?: boolean;
   createdAt: string;
   updatedAt: string;
+  category?: string;
+  compareAtPrice?: string;
+  costPrice?: string;
+  inventory?: number;
 };
 
 type Vendor = {
@@ -109,6 +113,11 @@ export default function AiContent() {
     { value: "Before-After-Bridge", label: "BAB", description: "Before → After → Bridge" },
     { value: "STAR", label: "STAR", description: "Situation → Task → Action → Result" }
   ];
+
+  const getVendorName = (vendorId: number): string => {
+    const vendor = (vendors as Vendor[]).find((v: Vendor) => v.id === vendorId);
+    return vendor?.name || 'Unknown Vendor';
+  };
 
   const generateContentMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -265,7 +274,7 @@ export default function AiContent() {
   };
 
   // Filter products based on search
-  const filteredProducts = products.filter((product: Product) =>
+  const filteredProducts = (products as Product[]).filter((product: Product) =>
     product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
     product.sku.toLowerCase().includes(productSearch.toLowerCase()) ||
     getVendorName(product.vendorId).toLowerCase().includes(productSearch.toLowerCase())
@@ -281,7 +290,7 @@ export default function AiContent() {
       return;
     }
 
-    const vendor = vendors.find((v: Vendor) => v.id === selectedProduct.vendorId);
+    const vendor = (vendors as Vendor[]).find((v: Vendor) => v.id === selectedProduct.vendorId);
     
     // Use custom details if provided, otherwise fall back to product data
     const productName = productDetails.customName || selectedProduct.name;
@@ -339,11 +348,6 @@ export default function AiContent() {
       title: "Copied",
       description: "Content copied to clipboard",
     });
-  };
-
-  const getVendorName = (vendorId: number): string => {
-    const vendor = vendors.find((v: Vendor) => v.id === vendorId);
-    return vendor?.name || 'Unknown Vendor';
   };
 
   return (
@@ -968,7 +972,7 @@ export default function AiContent() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {aiGenerations.length === 0 ? (
+                {(aiGenerations as any[]).length === 0 ? (
                   <div className="text-center py-12">
                     <History className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -980,7 +984,7 @@ export default function AiContent() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {aiGenerations.map((generation: any) => (
+                    {(aiGenerations as any[]).map((generation: any) => (
                       <div key={generation.id} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center space-x-2">

@@ -114,7 +114,9 @@ export interface ProductDescriptionRequest {
   productName: string;
   currentDescription?: string;
   features?: string;
-  benefits?: string;
+  primaryKeyword?: string;
+  secondaryKeyword?: string;
+  specs?: string;
   targetAudience?: string;
   framework: string;
   brandVoice?: string;
@@ -122,6 +124,7 @@ export interface ProductDescriptionRequest {
   category?: string;
   upc?: string;
   variants?: any[];
+  vendorName?: string;
 }
 
 export async function generateMarketingDescription(request: ProductDescriptionRequest): Promise<{
