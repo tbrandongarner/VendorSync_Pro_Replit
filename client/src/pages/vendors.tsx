@@ -33,13 +33,13 @@ export default function Vendors() {
   const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
 
   // Query sync jobs to show real-time status
-  const { data: syncJobs = [] } = useQuery({
+  const { data: syncJobs = [] } = useQuery<any[]>({
     queryKey: ["/api/sync/jobs"],
     enabled: isAuthenticated,
     refetchInterval: 2000, // Poll every 2 seconds
   });
 
-  const { data: vendors = [], isLoading: vendorsLoading } = useQuery({
+  const { data: vendors = [], isLoading: vendorsLoading } = useQuery<any[]>({
     queryKey: ["/api/vendors"],
     enabled: isAuthenticated,
   });
