@@ -6,7 +6,7 @@ import path from "path";
 import fs from "fs";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { generateProductContent, generateProductDescription } from "./services/openai";
+import { generateProductContent, generateProductDescription, generateMarketingDescription } from "./services/openai";
 import { initWebSocketService, getWebSocketService } from "./services/websocket";
 import { insertVendorSchema, insertStoreSchema, insertProductSchema, updateProductSchema } from "@shared/schema";
 import fileUploadRoutes from "./routes/file-upload";
@@ -704,6 +704,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating description:", error);
       res.status(500).json({ message: "Failed to generate description" });
+    }
+  });
+
+  // AI Generation - Marketing Description with Frameworks
+  app.post('/api/ai/generate-marketing', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const {
+        productName,
+        currentDescription,
+        features,
+        targetAudience,
+        framework,
+        brandVoice,
+        price,
+        category,
+        upc,
+        variants,
+        vendorName
+      } = req.body;
+      
+      if (!productName || !framework) {
+        return res.status(400).json({ message: "Product name and marketing framework are required" });
+      }
+      
+      const marketingContent = await generateMarketingDescription({
+        productName,
+        currentDescription,
+        features,
+        targetAudience,
+        framework,
+        brandVoice,
+        price,
+        category,
+        upc,
+        variants
+      });
+      
+      // Save AI generation record
+      await storage.createAiGeneration({
+        userId,
+        prompt: `Marketing ${framework} for: ${productName} | Target: ${targetAudience || 'General'} | Features: ${features || 'Standard'}`,
+        generatedContent: JSON.stringify(marketingContent),
+        model: 'gpt-4o',
+        success: true,
+      });
+      
+      // Create activity
+      await storage.createActivity({
+        userId,
+        type: 'ai_generation',
+        description: `Generated ${framework} marketing description for "${productName}"`,
+        metadata: { 
+          productName, 
+          framework, 
+          targetAudience,
+          vendorName,
+          contentType: 'marketing_description' 
+        }
+      });
+      
+      res.json(marketingContent);
+    } catch (error) {
+      console.error("Error generating marketing content:", error);
+      res.status(500).json({ message: "Failed to generate marketing content" });
     }
   });
 
