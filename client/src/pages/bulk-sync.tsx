@@ -191,7 +191,7 @@ export default function BulkSync() {
                     <SelectItem value="all">All Stores</SelectItem>
                     {stores.map((store) => (
                       <SelectItem key={store.id} value={store.id.toString()}>
-                        {store.shopDomain}
+                        {store.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
