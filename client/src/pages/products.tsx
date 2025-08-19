@@ -363,7 +363,13 @@ export default function Products() {
                             <h3 className="font-semibold text-lg truncate">{product.name}</h3>
                             <p className="text-sm text-gray-600 truncate">
                               {getVendorName(product.vendorId)} • SKU: {product.sku}
+                              {product.upc && <span> • UPC: {product.upc}</span>}
                             </p>
+                            {product.costPrice && (
+                              <p className="text-xs text-gray-500">
+                                Cost: ${parseFloat(product.costPrice).toFixed(2)}
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center space-x-3 text-sm">
                             {product.brand && (
@@ -453,10 +459,24 @@ export default function Products() {
                         </div>
                       )}
                       
+                      {viewMode !== 'grid' && product.upc && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">UPC</span>
+                          <span className="font-mono text-xs">{product.upc}</span>
+                        </div>
+                      )}
+                      
                       <div className={`flex items-center justify-between ${viewMode === 'grid' ? 'text-xs' : 'text-sm'}`}>
                         <span className="text-gray-600">Price</span>
                         <span className="font-medium">{formatPrice(product.price)}</span>
                       </div>
+                      
+                      {viewMode !== 'grid' && product.costPrice && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Cost</span>
+                          <span className="font-medium text-green-600">${parseFloat(product.costPrice).toFixed(2)}</span>
+                        </div>
+                      )}
                       
                       {viewMode !== 'grid' && product.compareAtPrice && parseFloat(product.compareAtPrice) > parseFloat(product.price || 0) && (
                         <div className="flex items-center justify-between text-sm">
@@ -481,6 +501,13 @@ export default function Products() {
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">Category</span>
                           <Badge variant="outline" className="text-xs">{product.category}</Badge>
+                        </div>
+                      )}
+                      
+                      {viewMode !== 'grid' && product.variants && Array.isArray(product.variants) && product.variants.length > 1 && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Variants</span>
+                          <Badge variant="outline" className="text-xs">{product.variants.length} options</Badge>
                         </div>
                       )}
                       

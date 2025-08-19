@@ -28,6 +28,8 @@ export function ProductEditDialog({ product, open, onOpenChange, onSave }: Produ
       description: product.description || "",
       price: product.price?.toString() || "",
       compareAtPrice: product.compareAtPrice?.toString() || "",
+      costPrice: product.costPrice?.toString() || "",
+      upc: product.upc || "",
       inventory: product.inventory || 0,
       category: product.category || "",
       status: product.status || "active",
@@ -115,6 +117,44 @@ export function ProductEditDialog({ product, open, onOpenChange, onSave }: Produ
                         type="number" 
                         step="0.01" 
                         placeholder="0.00" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Cost Price */}
+              <FormField
+                control={form.control}
+                name="costPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cost Price</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="0.00" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* UPC */}
+              <FormField
+                control={form.control}
+                name="upc"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>UPC/Barcode</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Product UPC" 
                         {...field} 
                       />
                     </FormControl>

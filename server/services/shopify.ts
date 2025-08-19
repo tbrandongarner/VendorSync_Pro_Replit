@@ -49,6 +49,20 @@ export interface ShopifyVariant {
   admin_graphql_api_id: string;
 }
 
+export interface ShopifyInventoryItem {
+  id: string;
+  sku: string;
+  created_at: string;
+  updated_at: string;
+  requires_shipping: boolean;
+  cost: string; // Cost per item
+  country_code_of_origin: string;
+  province_code_of_origin: string;
+  harmonized_system_code: string;
+  tracked: boolean;
+  country_harmonized_system_codes: any[];
+}
+
 export interface ShopifyOption {
   id: string;
   product_id: string;

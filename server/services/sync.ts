@@ -188,18 +188,64 @@ export class ProductSyncService {
           // Process each product
           for (const shopifyProduct of allProducts) {
             try {
+              // Extract primary variant data
+              const primaryVariant = shopifyProduct.variants?.[0];
+              const sku = primaryVariant?.sku || `shopify-${shopifyProduct.id}`;
+              const upc = primaryVariant?.barcode || null; // UPC from variant barcode
+              
+              // Fetch cost price from inventory item API if inventory_item_id is available
+              let costPrice: string | null = null;
+              if (primaryVariant?.inventory_item_id) {
+                try {
+                  const inventoryUrl = `https://${shopifyDomain}/admin/api/2023-10/inventory_items/${primaryVariant.inventory_item_id}.json`;
+                  const inventoryResponse = await fetch(inventoryUrl, {
+                    headers: {
+                      'X-Shopify-Access-Token': accessToken,
+                      'Content-Type': 'application/json'
+                    }
+                  });
+                  
+                  if (inventoryResponse.ok) {
+                    const inventoryData = await inventoryResponse.json();
+                    costPrice = inventoryData.inventory_item?.cost || null;
+                    console.log(`Retrieved cost price for ${sku}: ${costPrice}`);
+                  }
+                } catch (costError) {
+                  console.warn(`Could not fetch cost for ${sku}:`, costError);
+                }
+              }
+
+              // Prepare variant data for storage
+              const variantData = shopifyProduct.variants?.map((variant: any) => ({
+                id: variant.id,
+                title: variant.title,
+                price: variant.price,
+                sku: variant.sku,
+                barcode: variant.barcode,
+                inventory_quantity: variant.inventory_quantity,
+                compare_at_price: variant.compare_at_price,
+                position: variant.position,
+                option1: variant.option1,
+                option2: variant.option2,
+                option3: variant.option3,
+                weight: variant.weight,
+                weight_unit: variant.weight_unit
+              })) || [];
+
               // Check if product already exists locally
-              const existingProduct = shopifyProduct.variants?.[0]?.sku ? 
-                await storage.getProductBySku(shopifyProduct.variants[0].sku) : null;
+              const existingProduct = await storage.getProductBySku(sku);
 
               if (existingProduct) {
-                // Update existing product
+                // Update existing product with new fields
                 await storage.updateProduct(existingProduct.id, {
                   name: shopifyProduct.title,
                   description: shopifyProduct.body_html || shopifyProduct.description,
-                  price: shopifyProduct.variants?.[0]?.price || '0',
-                  compareAtPrice: shopifyProduct.variants?.[0]?.compare_at_price || null,
-                  inventory: shopifyProduct.variants?.[0]?.inventory_quantity || 0,
+                  price: primaryVariant?.price || '0',
+                  compareAtPrice: primaryVariant?.compare_at_price || null,
+                  upc: upc,
+                  costPrice: costPrice,
+                  inventory: primaryVariant?.inventory_quantity || 0,
+                  variants: variantData, // Store all variant information
                   tags: shopifyProduct.tags ? shopifyProduct.tags.split(',').map((t: string) => t.trim()) : [],
                   images: shopifyProduct.images?.map((img: any) => img.src) || [],
                   shopifyProductId: shopifyProduct.id.toString(),
@@ -207,18 +253,21 @@ export class ProductSyncService {
                   needsSync: false
                 });
                 updated++;
-                console.log(`Updated product: ${shopifyProduct.title}`);
+                console.log(`Updated product: ${shopifyProduct.title} (UPC: ${upc}, Cost: ${costPrice})`);
               } else {
-                // Create new product
+                // Create new product with all new fields
                 await storage.createProduct({
                   vendorId: vendorId,
                   storeId: this.store.id,
-                  sku: shopifyProduct.variants?.[0]?.sku || `shopify-${shopifyProduct.id}`,
+                  sku: sku,
                   name: shopifyProduct.title,
                   description: shopifyProduct.body_html || shopifyProduct.description,
-                  price: shopifyProduct.variants?.[0]?.price || '0',
-                  compareAtPrice: shopifyProduct.variants?.[0]?.compare_at_price || null,
-                  inventory: shopifyProduct.variants?.[0]?.inventory_quantity || 0,
+                  price: primaryVariant?.price || '0',
+                  compareAtPrice: primaryVariant?.compare_at_price || null,
+                  upc: upc,
+                  costPrice: costPrice,
+                  inventory: primaryVariant?.inventory_quantity || 0,
+                  variants: variantData, // Store all variant information
                   tags: shopifyProduct.tags ? shopifyProduct.tags.split(',').map((t: string) => t.trim()) : [],
                   images: shopifyProduct.images?.map((img: any) => img.src) || [],
                   shopifyProductId: shopifyProduct.id.toString(),
@@ -227,7 +276,7 @@ export class ProductSyncService {
                   needsSync: false
                 });
                 created++;
-                console.log(`Created product: ${shopifyProduct.title}`);
+                console.log(`Created product: ${shopifyProduct.title} (UPC: ${upc}, Cost: ${costPrice})`);
               }
             } catch (productError) {
               console.error(`Error processing product ${shopifyProduct.title}:`, productError);

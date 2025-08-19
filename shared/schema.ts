@@ -97,6 +97,8 @@ export const products = pgTable("products", {
   compareAtPrice: decimal("compare_at_price", { precision: 15, scale: 2 }),
   sku: varchar("sku").notNull(), // SKU is now primary identifier
   barcode: varchar("barcode"),
+  upc: varchar("upc"), // UPC/barcode from Shopify variants
+  costPrice: decimal("cost_price", { precision: 15, scale: 2 }), // Cost per item
   inventory: integer("inventory").default(0),
   category: varchar("category"),
   brand: varchar("brand"), // Brand/vendor name for filtering
@@ -333,6 +335,8 @@ export const updateProductSchema = createInsertSchema(products).pick({
   description: true,
   price: true,
   compareAtPrice: true,
+  upc: true,
+  costPrice: true,
   inventory: true,
   category: true,
   status: true,
@@ -340,6 +344,8 @@ export const updateProductSchema = createInsertSchema(products).pick({
 }).extend({
   price: z.union([z.string(), z.number()]).transform(val => String(val)).optional(),
   compareAtPrice: z.union([z.string(), z.number()]).transform(val => String(val)).optional(),
+  costPrice: z.union([z.string(), z.number()]).transform(val => String(val)).optional(),
+  upc: z.string().optional(),
   inventory: z.union([z.string(), z.number()]).transform(val => Number(val)).optional(),
 });
 
