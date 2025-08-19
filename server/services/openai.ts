@@ -177,34 +177,24 @@ CONTENT INSTRUCTIONS:
 - Follow the ${request.framework} framework structure
 - Use professional, conversion-focused language
 
-Generate a response in JSON format:
+Generate a response in JSON format (ensure all HTML content is properly escaped for JSON):
 {
-  "description": "Complete HTML-formatted product description (500-700 words) with proper H2/H3 headers and structured sections",
+  "description": "Complete HTML-formatted product description (500-700 words) with proper H2/H3 headers and structured sections - escape all quotes and newlines for valid JSON",
   "framework": "${request.framework}",
   "bullets": ["8-10 compelling bullet points highlighting key benefits and features"],
   "cta": "Strong call-to-action phrase that creates urgency",
   "seoKeywords": ["15-20 SEO-optimized keywords including primary/secondary keywords and product-specific terms"]
 }
 
-EXAMPLE STRUCTURE:
-<h2>Revolutionary [Product Name] - Transform Your [Use Case]</h2>
-<p>Opening paragraph with emotional hook and primary keyword...</p>
+CRITICAL JSON FORMATTING RULES:
+- Escape all double quotes in HTML content as \"
+- Replace all newlines with \\n
+- Replace all tabs with \\t
+- Ensure the description field contains valid JSON string content
+- Test that your response is valid JSON before sending
 
-<h2>Key Features</h2>
-<h3>Advanced [Feature Name]</h3>
-<p>Feature description...</p>
-
-<h2>Benefits & Use Cases</h2>
-<p>How this product improves your life...</p>
-
-<h2>Technical Specifications</h2>
-<p>Detailed specs in readable format...</p>
-
-<h2>Why Choose [Product Name]</h2>
-<p>Competitive advantages...</p>
-
-<h2>Your Satisfaction Guaranteed</h2>
-<p>Warranties, guarantees, customer support...</p>
+EXAMPLE STRUCTURE (properly escaped for JSON):
+"<h2>Revolutionary [Product Name] - Transform Your [Use Case]</h2>\\n<p>Opening paragraph with emotional hook and primary keyword...</p>\\n\\n<h2>Key Features</h2>\\n<h3>Advanced [Feature Name]</h3>\\n<p>Feature description...</p>\\n\\n<h2>Benefits & Use Cases</h2>\\n<p>How this product improves your life...</p>\\n\\n<h2>Technical Specifications</h2>\\n<p>Detailed specs in readable format...</p>\\n\\n<h2>Why Choose [Product Name]</h2>\\n<p>Competitive advantages...</p>\\n\\n<h2>Your Satisfaction Guaranteed</h2>\\n<p>Warranties, guarantees, customer support...</p>"
 
 Requirements:
 - Professional HTML formatting with proper headers
@@ -220,7 +210,7 @@ Requirements:
       messages: [
         {
           role: "system",
-          content: "You are an expert e-commerce copywriter and marketing strategist specializing in conversion optimization. Always respond with valid JSON and use proven marketing frameworks."
+          content: "You are an expert e-commerce copywriter and marketing strategist specializing in conversion optimization. Always respond with valid JSON. When including HTML content, properly escape quotes and newlines to ensure valid JSON format."
         },
         {
           role: "user",
@@ -229,10 +219,32 @@ Requirements:
       ],
       response_format: { type: "json_object" },
       temperature: 0.8,
-      max_tokens: 1000,
+      max_tokens: 1500,
     });
 
-    const result = JSON.parse(response.choices[0].message.content || '{}');
+    const rawContent = response.choices[0].message.content || '{}';
+    console.log('Raw OpenAI response length:', rawContent.length);
+    console.log('Raw OpenAI response preview:', rawContent.substring(0, 200) + '...');
+    
+    let result;
+    try {
+      result = JSON.parse(rawContent);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      console.error('Full response:', rawContent);
+      
+      // Try to clean up common JSON issues with HTML content
+      const cleanedContent = rawContent
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+      
+      try {
+        result = JSON.parse(cleanedContent);
+      } catch (secondError) {
+        throw new Error(`Failed to parse OpenAI response as JSON: ${(parseError as Error).message}`);
+      }
+    }
     
     if (!result.description || !result.bullets || !result.cta) {
       throw new Error("Invalid response structure from OpenAI");
