@@ -177,9 +177,9 @@ export class BulkSyncService {
         name: productData.name,
         description: productData.description,
         price: productData.price,
-        cost: productData.cost,
-        msrp: productData.msrp,
-        quantity: productData.quantity,
+        costPrice: productData.costPrice,
+        compareAtPrice: productData.compareAtPrice,
+        inventory: productData.inventory,
         brand: productData.brand,
         category: productData.category,
         tags: productData.tags,
@@ -221,14 +221,14 @@ export class BulkSyncService {
     const images = shopifyProduct.images?.map((img: any) => img.src) || [];
 
     return {
-      shopifyId: shopifyProduct.id?.toString() || null,
+      shopifyProductId: shopifyProduct.id?.toString() || null,
       name: shopifyProduct.title || 'Untitled Product',
       description: shopifyProduct.body_html || null,
       sku: firstVariant?.sku || `shopify-${shopifyProduct.id}`,
-      price: firstVariant?.price ? parseFloat(firstVariant.price) : 0,
-      cost: firstVariant?.compare_at_price ? parseFloat(firstVariant.compare_at_price) : null,
-      msrp: firstVariant?.compare_at_price ? parseFloat(firstVariant.compare_at_price) : null,
-      quantity: firstVariant?.inventory_quantity || 0,
+      price: firstVariant?.price ? String(firstVariant.price) : null,
+      costPrice: null, // Cost not available from Shopify variant API
+      compareAtPrice: firstVariant?.compare_at_price ? String(firstVariant.compare_at_price) : null,
+      inventory: firstVariant?.inventory_quantity || 0,
       brand: shopifyProduct.vendor || null,
       category: shopifyProduct.product_type || null,
       tags: shopifyProduct.tags ? shopifyProduct.tags.split(',').map((t: string) => t.trim()) : null,
@@ -236,10 +236,9 @@ export class BulkSyncService {
       primaryImage: images[0] || null,
       status: shopifyProduct.status === 'active' ? 'active' : 'draft',
       storeId: shopifyProduct.storeId || 1,
-      vendorId: 1, // Will be set based on vendor matching
+      vendorId: 1, // TODO: Implement vendor matching logic or get from store default
       needsSync: false, // Just synced from Shopify
       lastModifiedBy: 'shopify-sync',
-      userId: userId,
     };
   }
 
