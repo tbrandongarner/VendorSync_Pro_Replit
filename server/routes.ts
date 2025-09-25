@@ -105,6 +105,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Rate limiting stats endpoint (authenticated)
+  app.get('/api/rate-limit/stats', isAuthenticated, async (req, res) => {
+    try {
+      const { ShopifyApiClient } = await import('./services/shopifyApiClient');
+      const globalStats = ShopifyApiClient.getGlobalStats();
+      res.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        rateLimitStats: globalStats,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Simple job monitoring endpoint (instead of Bull Board)
   app.get('/admin/queues', isAuthenticated, (req, res) => {
     res.json({ message: 'Simple queue monitoring - use /api/queues/stats for queue information' });

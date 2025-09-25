@@ -1,4 +1,5 @@
 import { Store, Product } from "@shared/schema";
+import { ShopifyApiClient } from './shopifyApiClient';
 
 export interface ShopifyProduct {
   id: string;
@@ -130,41 +131,24 @@ export interface ShopifyProductCreate {
 }
 
 export class ShopifyService {
-  private baseUrl: string;
-  private accessToken: string;
-  private apiVersion: string = '2024-01';
+  private apiClient: ShopifyApiClient;
+  private store: Store;
 
   constructor(store: Store) {
     if (!store.shopifyAccessToken) {
       throw new Error('Shopify access token is required');
     }
     
-    // Normalize the store URL - remove protocol if present, then add https://
-    const normalizedUrl = store.shopifyStoreUrl.replace(/^https?:\/\//, '');
-    this.baseUrl = `https://${normalizedUrl}/admin/api/${this.apiVersion}`;
-    this.accessToken = store.shopifyAccessToken;
+    this.store = store;
+    this.apiClient = ShopifyApiClient.getClient(store);
   }
 
   private async makeRequest<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    priority: 'high' | 'normal' | 'low' = 'normal'
   ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'X-Shopify-Access-Token': this.accessToken,
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Shopify API error: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-
-    return await response.json();
+    return await this.apiClient.request<T>(endpoint, options, priority);
   }
 
   // Product operations
@@ -177,28 +161,14 @@ export class ShopifyService {
       endpoint += `&page_info=${pageInfo}`;
     }
 
-    const url = `${this.baseUrl}${endpoint}`;
-    const response = await fetch(url, {
-      headers: {
-        'X-Shopify-Access-Token': this.accessToken,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Shopify API error: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-
-    const data = await response.json();
+    const data = await this.makeRequest<{ products: ShopifyProduct[] }>(endpoint, {}, 'normal');
     
-    // Extract page info from Link header
-    const linkHeader = response.headers.get('link');
-    const nextPageInfo = this.extractPageInfoFromHeader(linkHeader);
+    // TODO: Handle pagination - for now return products without page info
+    // We'll need to enhance the API client to return headers for pagination
 
     return {
       products: data.products,
-      pageInfo: nextPageInfo,
+      pageInfo: undefined, // TODO: Implement pagination with API client
     };
   }
 
