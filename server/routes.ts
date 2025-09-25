@@ -12,6 +12,7 @@ import { upload, ImageManager } from "./services/imageManager";
 import { BulkSyncService } from "./services/bulkSync";
 import { jobQueueService } from "./services/simpleQueue";
 import { healthCheckService } from "./services/healthCheck";
+import { ShopifyService } from "./services/shopify";
 import { insertVendorSchema, insertStoreSchema, insertProductSchema, updateProductSchema } from "@shared/schema";
 import fileUploadRoutes from "./routes/file-upload";
 
@@ -226,6 +227,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const storeData = insertStoreSchema.parse({ ...req.body, userId });
+      
+      // Validate Shopify credentials before storing
+      if (storeData.shopifyAccessToken && storeData.shopifyStoreUrl) {
+        try {
+          console.log(`Validating Shopify credentials for store: ${storeData.name}`);
+          const validationResult = await ShopifyService.validateCredentials(
+            storeData.shopifyStoreUrl, 
+            storeData.shopifyAccessToken
+          );
+          console.log(`Credentials validated successfully for shop: ${validationResult.shop.name}`);
+        } catch (validationError) {
+          console.error('Shopify credential validation failed:', validationError);
+          return res.status(400).json({ 
+            message: validationError instanceof Error ? validationError.message : 'Invalid Shopify credentials',
+            type: 'credential_validation_error'
+          });
+        }
+      }
+      
       const store = await storage.createStore(storeData);
       
       // Send real-time update
@@ -241,7 +261,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(store);
     } catch (error) {
       console.error("Error creating store:", error);
-      res.status(500).json({ message: "Failed to create store" });
+      
+      // Provide more specific error messages
+      if (error instanceof Error && error.message.includes('Invalid Shopify')) {
+        res.status(400).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: "Failed to create store" });
+      }
     }
   });
 

@@ -58,7 +58,8 @@ export class ShopifyApiClient {
 
   constructor(store: Store, config?: Partial<RateLimitConfig>) {
     this.store = store;
-    this.storeId = store.id.toString();
+    // Handle case where store.id might be undefined (for validation)
+    this.storeId = store.id ? store.id.toString() : `temp-${store.shopifyStoreUrl || 'unknown'}`;
     
     // Validate store credentials
     if (!store.shopifyAccessToken) {
@@ -104,14 +105,15 @@ export class ShopifyApiClient {
     // Register this client for the store
     ShopifyApiClient.rateLimiters.set(this.storeId, this);
     
-    console.log(`Initialized Shopify API client for store ${store.name} with rate limit: ${this.config.maxBucketSize} calls, ${this.config.refillRate}/sec refill`);
+    console.log(`Initialized Shopify API client for store ${store.name || 'validation-temp'} with rate limit: ${this.config.maxBucketSize} calls, ${this.config.refillRate}/sec refill`);
   }
 
   /**
    * Get or create a rate-limited API client for a store
    */
   static getClient(store: Store): ShopifyApiClient {
-    const storeId = store.id.toString();
+    // Handle case where store.id might be undefined (for validation)
+    const storeId = store.id ? store.id.toString() : `temp-${store.shopifyStoreUrl || 'unknown'}`;
     let client = ShopifyApiClient.rateLimiters.get(storeId);
     
     if (!client) {

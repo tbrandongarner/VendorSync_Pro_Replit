@@ -433,8 +433,8 @@ export class ShopifyService {
       shopifyProductId: shopifyProduct.id,
       name: shopifyProduct.title,
       description: shopifyProduct.body_html,
-      price: primaryVariant?.price ? parseFloat(primaryVariant.price) : 0,
-      compareAtPrice: primaryVariant?.compare_at_price ? parseFloat(primaryVariant.compare_at_price) : null,
+      price: primaryVariant?.price || '0',
+      compareAtPrice: primaryVariant?.compare_at_price || null,
       sku: primaryVariant?.sku || '',
       barcode: primaryVariant?.barcode || '',
       inventory: primaryVariant?.inventory_quantity || 0,
@@ -472,20 +472,64 @@ export class ShopifyService {
     const options: { name: string; values: string[] }[] = [];
     
     if (variants.some(v => v.option1)) {
-      const values = [...new Set(variants.map(v => v.option1).filter(Boolean))];
+      const values = Array.from(new Set(variants.map(v => v.option1).filter(Boolean)));
       options.push({ name: 'Option 1', values });
     }
     
     if (variants.some(v => v.option2)) {
-      const values = [...new Set(variants.map(v => v.option2).filter(Boolean))];
+      const values = Array.from(new Set(variants.map(v => v.option2).filter(Boolean)));
       options.push({ name: 'Option 2', values });
     }
     
     if (variants.some(v => v.option3)) {
-      const values = [...new Set(variants.map(v => v.option3).filter(Boolean))];
+      const values = Array.from(new Set(variants.map(v => v.option3).filter(Boolean)));
       options.push({ name: 'Option 3', values });
     }
     
     return options;
+  }
+
+  /**
+   * Validates Shopify credentials by making a test API call
+   * Returns shop information if valid, throws error if invalid
+   */
+  async validateCredentials(): Promise<{ shop: { name: string; domain: string; email: string } }> {
+    try {
+      // Test credentials by fetching shop information
+      const response = await this.makeRequest<{ shop: { name: string; domain: string; email: string } }>(
+        '/shop.json'
+      );
+      return response;
+    } catch (error) {
+      console.error('Shopify credential validation failed:', error);
+      if (error instanceof Error) {
+        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+          throw new Error('Invalid Shopify API credentials. Please check your access token.');
+        }
+        if (error.message.includes('403') || error.message.includes('Forbidden')) {
+          throw new Error('Shopify API access denied. Please ensure your token has the required permissions.');
+        }
+      }
+      throw new Error('Unable to validate Shopify credentials. Please check your store URL and access token.');
+    }
+  }
+
+  /**
+   * Static method to validate credentials without storing the configuration
+   */
+  static async validateCredentials(shopUrl: string, accessToken: string): Promise<{ shop: { name: string; domain: string; email: string } }> {
+    // Create temporary store object for validation
+    const tempStore: Partial<Store> = {
+      shopifyStoreUrl: shopUrl,
+      shopifyAccessToken: accessToken
+    };
+
+    try {
+      const service = new ShopifyService(tempStore as Store);
+      return await service.validateCredentials();
+    } catch (error) {
+      console.error('Static credential validation failed:', error);
+      throw error;
+    }
   }
 }
