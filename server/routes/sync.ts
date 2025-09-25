@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { isAuthenticated } from '../replitAuth.js';
 import { storage } from '../storage.js';
-import { jobQueueService } from '../services/simpleQueue.js';
+import { JobQueueService } from '../services/jobQueue.js';
+
+const jobQueueService = JobQueueService.getInstance();
 
 const router = Router();
 

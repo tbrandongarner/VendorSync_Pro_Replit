@@ -241,23 +241,49 @@ export class JobQueueService {
         throw new Error('Store or vendor not found');
       }
 
-      // Import sync service
-      const { ProductSyncService } = await import('./sync');
-      const syncService = new ProductSyncService(store);
+      // Import idempotent sync service  
+      const { IdempotentProductSyncService } = await import('./idempotentSync');
+      const syncService = new IdempotentProductSyncService(store, storage);
 
       // Start sync process
       await job.updateProgress(10);
       
-      const result = await syncService.syncProducts(vendorId, options);
+      const idempotentOptions = {
+        direction: options.direction || 'shopify_to_local',
+        batchSize: options.batchSize || 50,
+        syncImages: options.syncImages !== false,
+        syncInventory: options.syncInventory !== false,
+        syncPricing: options.syncPricing !== false,
+        syncTags: options.syncTags !== false,
+        syncVariants: options.syncVariants !== false,
+        syncDescriptions: options.syncDescriptions !== false,
+        conflictDetection: {
+          direction: options.direction || 'shopify_to_local',
+          vendorPriority: 'remote',
+          timestampTolerance: 300000,
+          enableAutoMerge: true,
+          skipUnchanged: true
+        },
+        resolution: {
+          vendorPriority: 'remote',
+          timestampTolerance: 300000,
+          autoMergeEnabled: true,
+          preserveLocalInventory: false,
+          preserveLocalPricing: false,
+          allowManualReview: true
+        }
+      } as const;
+      
+      const result = await syncService.syncProducts(vendorId, syncJobId, idempotentOptions);
       
       await job.updateProgress(90);
 
-      // Update job completion
+      // Update job completion with IdempotentSyncResult format
       await storage.updateSyncJob(syncJobId, {
         status: result.success ? 'completed' : 'failed',
         completedAt: new Date(),
-        processedItems: result.created + result.updated,
-        errors: result.errors ? JSON.stringify(result.errors) : null,
+        processedItems: result.stats.productsProcessed,
+        errors: result.errors.length > 0 ? JSON.stringify(result.errors) : null,
       });
 
       job.updateProgress(100);
@@ -266,13 +292,17 @@ export class JobQueueService {
       await storage.createActivity({
         userId,
         type: 'vendor_sync',
-        description: `Synchronized ${result.created + result.updated} products for ${vendor.name}`,
+        description: `Synchronized ${result.stats.productsCreated + result.stats.productsUpdated} products for ${vendor.name}`,
         metadata: {
           vendorId,
           storeId,
-          created: result.created,
-          updated: result.updated,
-          failed: result.failed,
+          created: result.stats.productsCreated,
+          updated: result.stats.productsUpdated,
+          failed: result.stats.productsFailed,
+          skipped: result.stats.productsSkipped,
+          found: result.stats.productsFound,
+          conflictsDetected: result.stats.conflictsDetected,
+          conflictsResolved: result.stats.conflictsResolved,
         },
       });
 
