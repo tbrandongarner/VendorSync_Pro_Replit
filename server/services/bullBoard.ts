@@ -1,19 +1,36 @@
-import { createBullBoard } from '@bull-board/api';
-import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
-import { ExpressAdapter } from '@bull-board/express';
-import { syncQueue, fileImportQueue, pricingQueue } from './jobQueue';
+// Bull Board disabled - using simple in-memory queues without Redis
+import { Express } from 'express';
 
-// Create Bull Board for job monitoring
-const serverAdapter = new ExpressAdapter();
+// Mock adapter for development without Redis
+class MockServerAdapter {
+  setBasePath(path: string) {
+    console.log(`Bull Board would be available at ${path} (disabled in Redis-free mode)`);
+  }
+  
+  getRouter() {
+    const express = require('express');
+    const router = express.Router();
+    
+    // Return a simple status endpoint instead
+    router.get('/', (req: any, res: any) => {
+      res.json({
+        message: 'Bull Board disabled - using in-memory job queues',
+        status: 'development',
+        queues: ['sync-operations', 'file-import', 'pricing-updates']
+      });
+    });
+    
+    return router;
+  }
+}
+
+const serverAdapter = new MockServerAdapter();
 serverAdapter.setBasePath('/admin/queues');
 
-const { addQueue, removeQueue, setQueues, replaceQueues } = createBullBoard({
-  queues: [
-    new BullMQAdapter(syncQueue),
-    new BullMQAdapter(fileImportQueue),
-    new BullMQAdapter(pricingQueue),
-  ],
-  serverAdapter,
-});
+// Mock functions for compatibility
+const addQueue = () => {};
+const removeQueue = () => {};
+const setQueues = () => {};
+const replaceQueues = () => {};
 
 export { serverAdapter, addQueue, removeQueue, setQueues, replaceQueues };

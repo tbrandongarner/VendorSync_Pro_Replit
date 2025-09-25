@@ -1,61 +1,18 @@
-import { Queue, Worker, Job, QueueOptions, WorkerOptions } from 'bullmq';
-import IORedis from 'ioredis';
 import { getWebSocketService } from './websocket';
 import { storage } from '../storage';
 import { MemoryQueue, MemoryWorker, type MemoryJob } from './memoryQueue';
 import type { InsertSyncJob, SyncJob } from '@shared/schema';
 
-// Check Redis availability
-let redisAvailable = false;
-let connection: IORedis | null = null;
+// Use in-memory queue system (Redis-free for this environment)
+const redisAvailable = false;
+console.log('Using in-memory queue system for job processing');
 
-async function checkRedisConnection(): Promise<boolean> {
-  try {
-    const redis = new IORedis({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379'),
-      maxRetriesPerRequest: 1,
-      retryDelayOnFailover: 100,
-      connectTimeout: 3000,
-      lazyConnect: true,
-    });
-
-    await redis.connect();
-    await redis.ping();
-    connection = redis;
-    redisAvailable = true;
-    console.log('Redis connection established successfully');
-    return true;
-  } catch (error) {
-    console.warn('Redis not available, falling back to in-memory queue:', error instanceof Error ? error.message : 'Unknown error');
-    return false;
-  }
-}
-
-// Initialize Redis connection
-await checkRedisConnection();
-
-// Queue configuration (only used if Redis is available)
-const queueConfig: QueueOptions = redisAvailable && connection ? {
-  connection,
-  defaultJobOptions: {
-    removeOnComplete: { count: 50 }, // Keep last 50 completed jobs
-    removeOnFail: { count: 100 },    // Keep last 100 failed jobs
-    attempts: 3,          // Retry failed jobs up to 3 times
-    backoff: {
-      type: 'exponential',
-      delay: 2000,        // Start with 2 second delay
-    },
-  },
-} : {};
-
-// Worker configuration (only used if Redis is available)
-const workerConfig: WorkerOptions = redisAvailable && connection ? {
-  connection,
-  concurrency: 5,       // Process up to 5 jobs concurrently
-  removeOnComplete: { count: 50 },
-  removeOnFail: { count: 100 },
-} : {} as WorkerOptions;
+// In-memory queue configuration (no Redis needed)
+const queueConfig = {
+  maxJobs: 1000,
+  retryAttempts: 3,
+  retryDelay: 2000
+};
 
 // Job types and interfaces
 export interface SyncJobData {
@@ -89,15 +46,15 @@ export interface PricingUpdateJobData {
   action: 'apply' | 'revert';
 }
 
-// Create queues (BullMQ if Redis available, otherwise memory queues)
-export const syncQueue = redisAvailable ? new Queue('sync-operations', queueConfig) : new MemoryQueue('sync-operations');
-export const fileImportQueue = redisAvailable ? new Queue('file-import', queueConfig) : new MemoryQueue('file-import');
-export const pricingQueue = redisAvailable ? new Queue('pricing-updates', queueConfig) : new MemoryQueue('pricing-updates');
+// Create in-memory queues (Redis-free)
+export const syncQueue = new MemoryQueue('sync-operations');
+export const fileImportQueue = new MemoryQueue('file-import');
+export const pricingQueue = new MemoryQueue('pricing-updates');
 
 // Job processing service
 export class JobQueueService {
   private static instance: JobQueueService;
-  private workers: Worker[] = [];
+  private workers: MemoryWorker[] = [];
   private wsService = getWebSocketService();
 
   private constructor() {
@@ -112,17 +69,16 @@ export class JobQueueService {
   }
 
   private setupWorkers() {
-    if (redisAvailable && connection) {
-      // Use BullMQ workers when Redis is available
-      const syncWorker = new Worker('sync-operations', async (job: Job<SyncJobData>) => {
-        await this.processSyncJob(job);
-      }, workerConfig);
+    // Use in-memory workers (Redis-free)
+    const syncWorker = new MemoryWorker('sync-operations', async (job: MemoryJob) => {
+      await this.processSyncJobMemory(job);
+    });
 
-      const fileImportWorker = new Worker('file-import', async (job: Job<FileImportJobData>) => {
-        await this.processFileImportJob(job);
-      }, workerConfig);
+    const fileImportWorker = new MemoryWorker('file-import', async (job: MemoryJob) => {
+      await this.processFileImportJobMemory(job);
+    });
 
-      const pricingWorker = new Worker('pricing-updates', async (job: Job<PricingUpdateJobData>) => {
+    const pricingWorker = new MemoryWorker('pricing-updates', async (job: MemoryJob) => {
         await this.processPricingJob(job);
       }, workerConfig);
 

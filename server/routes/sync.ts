@@ -1,9 +1,7 @@
 import { Router } from 'express';
 import { isAuthenticated } from '../replitAuth.js';
 import { storage } from '../storage.js';
-import { JobQueueService } from '../services/jobQueue.js';
-
-const jobQueueService = JobQueueService.getInstance();
+import { jobService } from '../services/simpleJobQueue.js';
 
 const router = Router();
 
@@ -52,19 +50,18 @@ router.post('/vendor/:vendorId', isAuthenticated, async (req: any, res) => {
       });
 
       // Start sync process using job queue
-      const queueJob = await jobQueueService.addFileImportJob({
+      const queueJobId = await jobService.addFileImportJob({
         vendorId,
         storeId: store.id,
         userId,
         uploadedProductIds: uploadedProducts.map(p => p.id),
-        importMode: 'csv_upload',
-        syncJobId: job.id,
+        importMode: 'both'
       });
       
       res.json({ 
         success: true, 
         jobId: job.id,
-        queueJobId: queueJob.id,
+        queueJobId: queueJobId,
         message: `Sync job started for ${uploadedProducts.length} uploaded products` 
       });
     } else {
@@ -86,7 +83,7 @@ router.post('/vendor/:vendorId', isAuthenticated, async (req: any, res) => {
       });
 
       // Start sync process using job queue
-      const queueJob = await jobQueueService.addSyncJob({
+      const queueJobId = await jobService.addSyncJob({
         syncJobId: job.id,
         vendorId,
         storeId: store.id,
@@ -107,7 +104,7 @@ router.post('/vendor/:vendorId', isAuthenticated, async (req: any, res) => {
       res.json({ 
         success: true, 
         jobId: job.id,
-        queueJobId: queueJob.id,
+        queueJobId: queueJobId,
         message: `Shopify sync job started for vendor ${vendor.name}` 
       });
     }

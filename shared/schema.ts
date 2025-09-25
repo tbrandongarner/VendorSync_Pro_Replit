@@ -99,6 +99,7 @@ export const products = pgTable("products", {
   barcode: varchar("barcode"),
   upc: varchar("upc"), // UPC/barcode from Shopify variants
   costPrice: decimal("cost_price", { precision: 15, scale: 2 }), // Cost per item
+  msrp: decimal("msrp", { precision: 15, scale: 2 }), // Manufacturer's Suggested Retail Price
   inventory: integer("inventory").default(0),
   category: varchar("category"),
   brand: varchar("brand"), // Brand/vendor name for filtering
