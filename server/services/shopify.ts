@@ -146,9 +146,10 @@ export class ShopifyService {
   private async makeRequest<T>(
     endpoint: string,
     options: RequestInit = {},
-    priority: 'high' | 'normal' | 'low' = 'normal'
+    priority: 'high' | 'normal' | 'low' = 'normal',
+    includeHeaders: boolean = false
   ): Promise<T> {
-    return await this.apiClient.request<T>(endpoint, options, priority);
+    return await this.apiClient.request<T>(endpoint, options, priority, includeHeaders);
   }
 
   // Product operations
@@ -161,14 +162,25 @@ export class ShopifyService {
       endpoint += `&page_info=${pageInfo}`;
     }
 
-    const data = await this.makeRequest<{ products: ShopifyProduct[] }>(endpoint, {}, 'normal');
+    const response = await this.makeRequest<{ 
+      data: { products: ShopifyProduct[] }; 
+      headers: Headers 
+    }>(endpoint, {}, 'normal', true);
     
-    // TODO: Handle pagination - for now return products without page info
-    // We'll need to enhance the API client to return headers for pagination
+    // Parse Link header for pagination
+    let nextPageInfo: string | undefined;
+    const linkHeader = response.headers.get('Link');
+    
+    if (linkHeader) {
+      const nextMatch = linkHeader.match(/<[^>]*[&?]page_info=([^&>]+)[^>]*>;\s*rel="next"/);
+      if (nextMatch) {
+        nextPageInfo = nextMatch[1];
+      }
+    }
 
     return {
-      products: data.products,
-      pageInfo: undefined, // TODO: Implement pagination with API client
+      products: response.data.products,
+      pageInfo: nextPageInfo,
     };
   }
 
@@ -237,6 +249,15 @@ export class ShopifyService {
       }
     );
     return response.inventory_level;
+  }
+
+  async getInventoryItems(
+    inventoryItemIds: string[]
+  ): Promise<ShopifyInventoryItem[]> {
+    const response = await this.makeRequest<{ inventory_items: ShopifyInventoryItem[] }>(
+      `/inventory_items.json?ids=${inventoryItemIds.join(',')}`
+    );
+    return response.inventory_items;
   }
 
   // Variant operations

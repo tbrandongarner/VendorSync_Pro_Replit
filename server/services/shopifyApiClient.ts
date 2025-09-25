@@ -127,7 +127,8 @@ export class ShopifyApiClient {
   async request<T>(
     endpoint: string,
     options: RequestInit = {},
-    priority: 'high' | 'normal' | 'low' = 'normal'
+    priority: 'high' | 'normal' | 'low' = 'normal',
+    includeHeaders: boolean = false
   ): Promise<T> {
     return new Promise((resolve, reject) => {
       const requestFn = async () => {
@@ -164,7 +165,16 @@ export class ShopifyApiClient {
             throw new Error(`Shopify API error: ${response.status} ${response.statusText} - ${errorText}`);
           }
 
-          return await response.json();
+          const data = await response.json();
+          
+          if (includeHeaders) {
+            return {
+              data,
+              headers: response.headers,
+            } as any;
+          }
+          
+          return data;
         } catch (error) {
           if (error instanceof Error && error.message.includes('RATE_LIMITED')) {
             throw error; // Re-throw rate limit errors for retry logic

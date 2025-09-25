@@ -1,4 +1,5 @@
 import { type Store } from "@shared/schema";
+import { ShopifyService } from "./shopify";
 
 export interface SyncResult {
   success: boolean;
@@ -40,9 +41,11 @@ export interface ProductData {
 
 export class ProductSyncService {
   private store: Store;
+  private shopifyService: ShopifyService;
 
   constructor(store: Store) {
     this.store = store;
+    this.shopifyService = new ShopifyService(store);
   }
 
   async syncSingleProduct(productData: ProductData | number, vendorId?: number | string): Promise<SyncResult> {
@@ -97,69 +100,26 @@ export class ProductSyncService {
         console.log(`Syncing products for vendor: ${vendor.name}`);
 
         try {
-          // Build Shopify API request
-          const shopifyStoreUrl = this.store.shopifyStoreUrl;
-          const accessToken = this.store.shopifyAccessToken;
+          console.log('Fetching products using rate-limited ShopifyService...');
           
-          console.log(`Store credentials check:`, {
-            hasStoreUrl: !!shopifyStoreUrl,
-            storeUrl: shopifyStoreUrl,
-            hasAccessToken: !!accessToken,
-            accessTokenLength: accessToken?.length
-          });
-
-          if (!shopifyStoreUrl || !accessToken) {
-            const error = `Shopify store credentials are missing: storeUrl=${!!shopifyStoreUrl}, accessToken=${!!accessToken}`;
-            console.error(error);
-            throw new Error(error);
-          }
-
-          // Extract domain from URL (e.g., "https://mystore.myshopify.com" -> "mystore.myshopify.com")
-          const shopifyDomain = shopifyStoreUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
-          console.log(`Fetching from Shopify store: ${shopifyDomain}`);
-          
-          // Fetch products from Shopify with vendor filtering
+          // Fetch products from Shopify using the rate-limited service
           let allProducts: any[] = [];
-          let nextPageInfo: string | null = null;
           let pageCount = 0;
           const maxPages = 10; // Limit to prevent infinite loops
+          let pageInfo: string | undefined = undefined;
 
           do {
             pageCount++;
-            console.log(`Fetching page ${pageCount} from Shopify...`);
+            console.log(`Fetching page ${pageCount} from Shopify using rate-limited API...`);
             
-            let url = `https://${shopifyDomain}/admin/api/2023-10/products.json?limit=${options.batchSize}`;
-            if (nextPageInfo) {
-              url += `&page_info=${nextPageInfo}`;
-            }
-
-            console.log(`Making API request to: ${url}`);
+            const result = await this.shopifyService.getProducts(options.batchSize, pageInfo);
+            console.log(`Retrieved ${result.products?.length || 0} products from page ${pageCount}`);
             
-            const response = await fetch(url, {
-              headers: {
-                'X-Shopify-Access-Token': accessToken,
-                'Content-Type': 'application/json'
-              }
-            });
-
-            console.log(`API response status: ${response.status} ${response.statusText}`);
-
-            if (!response.ok) {
-              const errorText = await response.text();
-              console.error(`Shopify API error details:`, errorText);
-              throw new Error(`Shopify API error: ${response.status} ${response.statusText} - ${errorText}`);
-            }
-
-            const data = await response.json();
-            console.log(`Retrieved ${data.products?.length || 0} products from page ${pageCount}`);
-            
-            if (data.products?.length > 0) {
-              console.log(`Sample product titles:`, data.products.slice(0, 3).map((p: any) => p.title));
-            }
-            
-            if (data.products && data.products.length > 0) {
+            if (result.products?.length > 0) {
+              console.log(`Sample product titles:`, result.products.slice(0, 3).map((p: any) => p.title));
+              
               // Filter products for this vendor using flexible matching
-              const vendorProducts = data.products.filter((product: any) => {
+              const vendorProducts = result.products.filter((product: any) => {
                 const titleMatch = product.title?.toLowerCase().includes(vendor.name.toLowerCase());
                 const vendorMatch = product.vendor?.toLowerCase().includes(vendor.name.toLowerCase());
                 const tagMatch = product.tags?.toLowerCase().includes(vendor.name.toLowerCase());
@@ -171,17 +131,16 @@ export class ProductSyncService {
               allProducts.push(...vendorProducts);
             }
 
-            // Check for pagination
-            const linkHeader = response.headers.get('Link');
-            nextPageInfo = null;
-            if (linkHeader) {
-              const nextMatch = linkHeader.match(/<[^>]*[&?]page_info=([^&>]+)[^>]*>;\s*rel="next"/);
-              if (nextMatch) {
-                nextPageInfo = nextMatch[1];
-              }
+            // Update pageInfo for next iteration - now properly parsed from Link headers
+            pageInfo = result.pageInfo;
+            
+            // If no pageInfo is returned, we've fetched all available products
+            if (!pageInfo) {
+              console.log('No more pages available - reached end of product catalog');
+              break;
             }
 
-          } while (nextPageInfo && pageCount < maxPages);
+          } while (pageInfo && pageCount < maxPages);
 
           console.log(`Total products found for vendor ${vendor.name}: ${allProducts.length}`);
 
@@ -201,41 +160,32 @@ export class ProductSyncService {
             }
           });
 
-          // Batch fetch inventory items for cost prices
+          // Batch fetch inventory items for cost prices using rate-limited API
           const inventoryCosts: Map<string, string> = new Map();
           if (inventoryItemIds.length > 0) {
-            console.log(`Fetching cost data for ${inventoryItemIds.length} inventory items`);
+            console.log(`Fetching cost data for ${inventoryItemIds.length} inventory items using rate-limited API...`);
             
             // Process in batches of 250 (Shopify API limit)
             const batchSize = 250;
             for (let i = 0; i < inventoryItemIds.length; i += batchSize) {
               const batchIds = inventoryItemIds.slice(i, i + batchSize);
-              const idsParam = batchIds.join(',');
               
               try {
-                const inventoryUrl = `https://${shopifyDomain}/admin/api/2023-10/inventory_items.json?ids=${idsParam}`;
-                const inventoryResponse = await fetch(inventoryUrl, {
-                  headers: {
-                    'X-Shopify-Access-Token': accessToken,
-                    'Content-Type': 'application/json'
-                  }
-                });
+                console.log(`Fetching inventory batch ${i}-${i+batchSize} using ShopifyService...`);
+                const inventoryItems = await this.shopifyService.getInventoryItems(batchIds);
                 
-                if (inventoryResponse.ok) {
-                  const inventoryData = await inventoryResponse.json();
-                  if (inventoryData.inventory_items) {
-                    inventoryData.inventory_items.forEach((item: any) => {
-                      if (item.cost && parseFloat(item.cost) > 0) {
-                        inventoryCosts.set(item.id.toString(), item.cost);
-                        const itemInfo = inventoryItemMap.get(item.id.toString());
-                        if (itemInfo) {
-                          console.log(`Retrieved cost price for ${itemInfo.sku}: $${item.cost}`);
-                        }
+                if (inventoryItems && inventoryItems.length > 0) {
+                  inventoryItems.forEach((item: any) => {
+                    if (item.cost && parseFloat(item.cost) > 0) {
+                      inventoryCosts.set(item.id.toString(), item.cost);
+                      const itemInfo = inventoryItemMap.get(item.id.toString());
+                      if (itemInfo) {
+                        console.log(`Retrieved cost price for ${itemInfo.sku}: $${item.cost}`);
                       }
-                    });
-                  }
+                    }
+                  });
                 } else {
-                  console.warn(`Failed to fetch inventory batch ${i}-${i+batchSize}: ${inventoryResponse.status}`);
+                  console.warn(`No inventory items returned for batch ${i}-${i+batchSize}`);
                 }
               } catch (batchError) {
                 console.warn(`Error fetching inventory batch ${i}-${i+batchSize}:`, batchError);
