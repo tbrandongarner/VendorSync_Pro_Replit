@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { isAuthenticated } from '../replitAuth.js';
 import { storage } from '../storage.js';
+import { jobQueueService } from '../services/simpleQueue.js';
 
 const router = Router();
 
@@ -48,151 +49,20 @@ router.post('/vendor/:vendorId', isAuthenticated, async (req: any, res) => {
         startedAt: new Date(),
       });
 
-      // Start sync process in background
-      setImmediate(async () => {
-        try {
-          // Import sync service dynamically
-          const { ProductSyncService } = await import('../services/sync.js');
-          const syncService = new ProductSyncService(store);
-          
-          // Update job status
-          await storage.updateSyncJob(job.id, { 
-            status: 'running',
-            startedAt: new Date() 
-          });
-
-          // Process uploaded products
-          let processed = 0;
-          let created = 0;
-          let updated = 0;
-          let failed = 0;
-
-          for (const uploadedProduct of uploadedProducts) {
-            try {
-              // Convert uploaded product to sync format
-              const productData = {
-                sku: uploadedProduct.sku,
-                name: uploadedProduct.name,
-                description: uploadedProduct.description,
-                price: parseFloat(uploadedProduct.price || '0'),
-                compareAtPrice: uploadedProduct.compareAtPrice ? parseFloat(uploadedProduct.compareAtPrice) : undefined,
-                inventory: uploadedProduct.inventory || 0,
-                barcode: uploadedProduct.barcode,
-                tags: uploadedProduct.tags ? JSON.parse(uploadedProduct.tags) : [],
-                images: uploadedProduct.images ? JSON.parse(uploadedProduct.images) : [],
-              };
-
-              // Sync to Shopify
-              const result = await syncService.syncSingleProduct(productData, vendorId);
-              
-              if (result.success) {
-                // Create or update product in main products table
-                const existingProduct = await storage.getProductBySku(uploadedProduct.sku);
-                
-                if (existingProduct) {
-                  // Update existing product
-                  await storage.updateProduct(existingProduct.id, {
-                    name: uploadedProduct.name,
-                    description: uploadedProduct.description,
-                    price: uploadedProduct.price,
-                    compareAtPrice: uploadedProduct.compareAtPrice,
-                    inventory: uploadedProduct.inventory || 0,
-                    tags: uploadedProduct.tags ? JSON.parse(uploadedProduct.tags) : [],
-                    images: uploadedProduct.images ? JSON.parse(uploadedProduct.images) : [],
-                    shopifyProductId: result.productId?.toString(),
-                    needsSync: false,
-                    lastModifiedBy: 'vendor_import'
-                  });
-                  updated++;
-                } else {
-                  // Create new product
-                  await storage.createProduct({
-                    vendorId: vendorId,
-                    storeId: store.id,
-                    sku: uploadedProduct.sku,
-                    name: uploadedProduct.name,
-                    description: uploadedProduct.description,
-                    price: uploadedProduct.price,
-                    compareAtPrice: uploadedProduct.compareAtPrice,
-                    inventory: uploadedProduct.inventory || 0,
-                    tags: uploadedProduct.tags ? JSON.parse(uploadedProduct.tags) : [],
-                    images: uploadedProduct.images ? JSON.parse(uploadedProduct.images) : [],
-                    shopifyProductId: result.productId?.toString(),
-                    status: 'active',
-                    needsSync: false,
-                    lastModifiedBy: 'vendor_import'
-                  });
-                  created++;
-                }
-                
-                // Update uploaded product status
-                await storage.updateUploadedProduct(uploadedProduct.id, {
-                  status: 'synced'
-                });
-              } else {
-                await storage.updateUploadedProduct(uploadedProduct.id, {
-                  status: 'failed',
-                  syncError: result.error
-                });
-                failed++;
-              }
-
-              processed++;
-              
-              // Update progress
-              const progress = Math.round((processed / uploadedProducts.length) * 100);
-              await storage.updateSyncJob(job.id, {
-                processedItems: processed,
-                progress: progress
-              });
-
-            } catch (error) {
-              console.error(`Error syncing product ${uploadedProduct.sku}:`, error);
-              await storage.updateUploadedProduct(uploadedProduct.id, {
-                status: 'failed',
-                syncError: error instanceof Error ? error.message : 'Unknown error'
-              });
-              failed++;
-              processed++;
-            }
-          }
-
-          // Complete sync job
-          await storage.updateSyncJob(job.id, {
-            status: 'completed',
-            completedAt: new Date(),
-            processedItems: processed,
-            progress: 100
-          });
-
-          // Log activity
-          await storage.createActivity({
-            userId,
-            type: 'vendor_sync',
-            description: `Uploaded products sync completed: ${created} created, ${updated} updated, ${failed} failed`,
-            metadata: JSON.stringify({ vendorId, storeId: store.id, created, updated, failed })
-          });
-
-        } catch (error) {
-          console.error('Sync process failed:', error);
-          await storage.updateSyncJob(job.id, {
-            status: 'failed',
-            completedAt: new Date(),
-            errors: JSON.stringify([error instanceof Error ? error.message : 'Unknown error'])
-          });
-
-          await storage.createActivity({
-            userId,
-            type: 'vendor_sync',
-            description: `Uploaded products sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            metadata: JSON.stringify({ vendorId, storeId: store.id, error: error instanceof Error ? error.message : 'Unknown error' })
-          });
-        }
+      // Start sync process using job queue
+      const queueJob = await jobQueueService.addFileImportJob({
+        vendorId,
+        storeId: store.id,
+        userId,
+        uploadedProductIds: uploadedProducts.map(p => p.id),
+        importMode: 'csv_upload',
+        syncJobId: job.id,
       });
       
       res.json({ 
         success: true, 
         jobId: job.id,
+        queueJobId: queueJob.id,
         message: `Sync job started for ${uploadedProducts.length} uploaded products` 
       });
     } else {
@@ -213,76 +83,29 @@ router.post('/vendor/:vendorId', isAuthenticated, async (req: any, res) => {
         startedAt: new Date(),
       });
 
-      // Start sync process in background
-      setImmediate(async () => {
-        try {
-          console.log(`Background sync started for job ${job.id}`);
-          
-          // Import sync service dynamically
-          const { ProductSyncService } = await import('../services/sync.js');
-          const syncService = new ProductSyncService(store);
-          
-          // Update job status
-          await storage.updateSyncJob(job.id, { 
-            status: 'running',
-            startedAt: new Date() 
-          });
-
-          console.log(`Processing ${existingProducts.length} existing products`);
-
-          // Use the bulk sync service method
-          const result = await syncService.syncProducts(vendorId, {
-            direction: 'shopify_to_local',
-            syncImages: true,
-            syncInventory: true,
-            syncPricing: true,
-            syncTags: true,
-            syncVariants: true,
-            syncDescriptions: true,
-            batchSize: 50,
-          });
-
-          console.log(`Sync completed with result:`, result);
-
-          // Complete sync job
-          await storage.updateSyncJob(job.id, {
-            status: 'completed',
-            completedAt: new Date(),
-            processedItems: result.created + result.updated + result.failed,
-            progress: 100
-          });
-
-          // Log activity
-          await storage.createActivity({
-            userId,
-            type: 'vendor_sync',
-            description: `Shopify sync completed: ${result.created} created, ${result.updated} updated, ${result.failed} failed`,
-            metadata: JSON.stringify({ vendorId, storeId: store.id, result })
-          });
-
-          console.log(`Sync job ${job.id} completed successfully`);
-
-        } catch (error) {
-          console.error('Shopify sync process failed:', error);
-          await storage.updateSyncJob(job.id, {
-            status: 'failed',
-            completedAt: new Date(),
-            errors: JSON.stringify([error instanceof Error ? error.message : 'Unknown error'])
-          });
-
-          await storage.createActivity({
-            userId,
-            type: 'vendor_sync',
-            description: `Shopify sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            metadata: JSON.stringify({ vendorId, storeId: store.id, error: error instanceof Error ? error.message : 'Unknown error' })
-          });
-        }
+      // Start sync process using job queue
+      const queueJob = await jobQueueService.addSyncJob({
+        syncJobId: job.id,
+        vendorId,
+        storeId: store.id,
+        userId,
+        options: {
+          direction: 'shopify_to_local',
+          syncImages: true,
+          syncInventory: true,
+          syncPricing: true,
+          syncTags: true,
+          syncVariants: true,
+          syncDescriptions: true,
+          batchSize: 50,
+        },
       });
       
       console.log(`Sync job ${job.id} created and started for vendor ${vendor.name}`);
       res.json({ 
         success: true, 
         jobId: job.id,
+        queueJobId: queueJob.id,
         message: `Shopify sync job started for vendor ${vendor.name}` 
       });
     }
