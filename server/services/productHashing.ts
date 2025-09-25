@@ -6,7 +6,7 @@ import { createHash } from 'crypto';
  */
 
 export interface ShopifyProduct {
-  id?: number;
+  id?: string | number; // Accept both string (from API) and number for compatibility
   title?: string;
   body_html?: string;
   vendor?: string;
@@ -15,7 +15,7 @@ export interface ShopifyProduct {
   status?: string;
   tags?: string;
   options?: Array<{
-    id?: number;
+    id?: string | number; // Accept both string (from API) and number for compatibility
     name?: string;
     position?: number;
     values?: string[];
@@ -30,8 +30,8 @@ export interface ShopifyProduct {
 }
 
 export interface ShopifyVariant {
-  id?: number;
-  product_id?: number;
+  id?: string | number; // Accept both string (from API) and number for compatibility
+  product_id?: string | number;
   title?: string;
   price?: string;
   sku?: string;
@@ -48,18 +48,18 @@ export interface ShopifyVariant {
   taxable?: boolean;
   barcode?: string;
   grams?: number;
-  image_id?: number;
+  image_id?: string | number; // Accept both string (from API) and number for compatibility
   inventory_quantity?: number;
   weight?: number;
   weight_unit?: string;
-  inventory_item_id?: number;
+  inventory_item_id?: string | number; // Accept both string (from API) and number for compatibility
   old_inventory_quantity?: number;
   requires_shipping?: boolean;
 }
 
 export interface ShopifyImage {
-  id?: number;
-  product_id?: number;
+  id?: string | number; // Accept both string (from API) and number for compatibility
+  product_id?: string | number;
   position?: number;
   created_at?: string;
   updated_at?: string;
@@ -67,7 +67,7 @@ export interface ShopifyImage {
   width?: number;
   height?: number;
   src?: string;
-  variant_ids?: number[];
+  variant_ids?: (string | number)[]; // Accept both string and number arrays for compatibility
 }
 
 /**
