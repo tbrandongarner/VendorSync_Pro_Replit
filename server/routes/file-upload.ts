@@ -16,14 +16,19 @@ const upload = multer({
     const allowedTypes = [
       'text/csv',
       'application/csv',
+      'text/plain', // CSV files often have text/plain MIME type
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     ];
     
-    if (allowedTypes.includes(file.mimetype)) {
+    // Also check file extension as fallback
+    const ext = file.originalname?.toLowerCase().split('.').pop();
+    const allowedExtensions = ['csv', 'xlsx', 'xls'];
+    
+    if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(ext || '')) {
       cb(null, true);
     } else {
-      cb(new Error('Only CSV and Excel files are allowed'));
+      cb(new Error(`Unsupported file type: ${file.mimetype} (${ext}). Only CSV and Excel files are allowed.`));
     }
   }
 });

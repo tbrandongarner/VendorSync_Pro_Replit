@@ -1268,9 +1268,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // File upload routes
-  app.use('/api/files', fileUploadRoutes);
-  app.use('/api/headers', headerAnalysisRoutes);
+  // File upload routes (with authentication)
+  app.use('/api/files', isAuthenticated, fileUploadRoutes);
+  app.use('/api/headers', isAuthenticated, headerAnalysisRoutes);
 
   // Bulk sync routes
   app.post("/api/sync/bulk-from-shopify", isAuthenticated, async (req: any, res) => {
