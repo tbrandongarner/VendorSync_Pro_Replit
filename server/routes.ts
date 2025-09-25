@@ -15,6 +15,7 @@ import { healthCheckService } from "./services/healthCheck";
 import { ShopifyService } from "./services/shopify";
 import { insertVendorSchema, insertStoreSchema, insertProductSchema, updateProductSchema } from "@shared/schema";
 import fileUploadRoutes from "./routes/file-upload";
+import headerAnalysisRoutes from "./routes/header-analysis";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
@@ -1269,6 +1270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // File upload routes
   app.use('/api/files', fileUploadRoutes);
+  app.use('/api/headers', headerAnalysisRoutes);
 
   // Bulk sync routes
   app.post("/api/sync/bulk-from-shopify", isAuthenticated, async (req: any, res) => {
