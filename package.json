@@ -11,6 +11,8 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@bull-board/api": "^6.13.0",
+    "@bull-board/express": "^6.13.0",
     "@google-cloud/storage": "^7.17.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
@@ -53,6 +55,7 @@
     "@uppy/file-input": "^4.2.2",
     "@uppy/progress-bar": "^4.3.2",
     "@uppy/react": "^4.5.2",
+    "bullmq": "^5.58.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -67,6 +70,7 @@
     "framer-motion": "^11.13.1",
     "google-auth-library": "^10.2.1",
     "input-otp": "^1.4.2",
+    "ioredis": "^5.8.0",
     "lucide-react": "^0.453.0",
     "memoizee": "^0.4.17",
     "memorystore": "^1.6.7",

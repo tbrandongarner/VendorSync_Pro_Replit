@@ -10,6 +10,8 @@ import { generateProductContent, generateProductDescription, generateMarketingDe
 import { initWebSocketService, getWebSocketService } from "./services/websocket";
 import { upload, ImageManager } from "./services/imageManager";
 import { BulkSyncService } from "./services/bulkSync";
+import { jobQueueService } from "./services/simpleQueue";
+import { healthCheckService } from "./services/healthCheck";
 import { insertVendorSchema, insertStoreSchema, insertProductSchema, updateProductSchema } from "@shared/schema";
 import fileUploadRoutes from "./routes/file-upload";
 
@@ -71,6 +73,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Logo upload error:', error);
       res.status(500).json({ message: 'Failed to upload logo' });
+    }
+  });
+
+  // Health Check and Monitoring Routes (No authentication required)
+  app.get('/health', async (req, res) => {
+    try {
+      const health = await healthCheckService.checkHealth();
+      const statusCode = health.status === 'healthy' ? 200 : health.status === 'degraded' ? 200 : 503;
+      res.status(statusCode).json(health);
+    } catch (error) {
+      res.status(503).json({
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.get('/health/ready', async (req, res) => {
+    try {
+      const readiness = await healthCheckService.checkReadiness();
+      const statusCode = readiness.ready ? 200 : 503;
+      res.status(statusCode).json(readiness);
+    } catch (error) {
+      res.status(503).json({
+        ready: false,
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Simple job monitoring endpoint (instead of Bull Board)
+  app.get('/admin/queues', isAuthenticated, (req, res) => {
+    res.json({ message: 'Simple queue monitoring - use /api/queues/stats for queue information' });
+  });
+
+  // Queue Management API Routes
+  app.get('/api/queues/stats', isAuthenticated, async (req, res) => {
+    try {
+      const stats = await Promise.all([
+        jobQueueService.getQueueStats('sync-operations'),
+        jobQueueService.getQueueStats('file-import'),
+        jobQueueService.getQueueStats('pricing-updates'),
+      ]);
+
+      res.json({
+        'sync-operations': stats[0],
+        'file-import': stats[1],
+        'pricing-updates': stats[2],
+      });
+    } catch (error) {
+      console.error('Error fetching queue stats:', error);
+      res.status(500).json({ message: 'Failed to fetch queue stats' });
+    }
+  });
+
+  app.post('/api/queues/:queueName/pause', isAuthenticated, async (req, res) => {
+    try {
+      const { queueName } = req.params;
+      await jobQueueService.pauseQueue(queueName);
+      res.json({ message: `Queue ${queueName} paused` });
+    } catch (error) {
+      console.error('Error pausing queue:', error);
+      res.status(500).json({ message: 'Failed to pause queue' });
+    }
+  });
+
+  app.post('/api/queues/:queueName/resume', isAuthenticated, async (req, res) => {
+    try {
+      const { queueName } = req.params;
+      await jobQueueService.resumeQueue(queueName);
+      res.json({ message: `Queue ${queueName} resumed` });
+    } catch (error) {
+      console.error('Error resuming queue:', error);
+      res.status(500).json({ message: 'Failed to resume queue' });
+    }
+  });
+
+  app.delete('/api/jobs/:queueName/:jobId', isAuthenticated, async (req, res) => {
+    try {
+      const { queueName, jobId } = req.params;
+      const cancelled = await jobQueueService.cancelJob(queueName, jobId);
+      
+      if (cancelled) {
+        res.json({ message: `Job ${jobId} cancelled` });
+      } else {
+        res.status(404).json({ message: 'Job not found' });
+      }
+    } catch (error) {
+      console.error('Error cancelling job:', error);
+      res.status(500).json({ message: 'Failed to cancel job' });
     }
   });
 
