@@ -5,6 +5,7 @@ import { SyncRunManager, ProductSyncEventData } from "./syncRunManager";
 import { ConflictDetectionService, ConflictDetectionOptions } from "./conflictDetection";
 import { ConflictResolutionService, ResolutionOptions } from "./conflictResolution";
 import { computeProductSignatures, ShopifyProduct } from "./productHashing";
+import { SyncErrorHandler, SyncError, RetryConfig, CircuitBreakerConfig, RetryExhaustedError } from "./syncErrorHandler";
 
 /**
  * Enhanced Product Sync Service with Idempotent Operations and Event Tracking
@@ -66,13 +67,20 @@ export class IdempotentProductSyncService {
   private syncRunManager: SyncRunManager;
   private conflictDetection: ConflictDetectionService;
   private conflictResolution: ConflictResolutionService;
+  private errorHandler: SyncErrorHandler;
 
-  constructor(store: Store, storage: IStorage) {
+  constructor(
+    store: Store, 
+    storage: IStorage,
+    retryConfig?: Partial<RetryConfig>,
+    circuitBreakerConfig?: Partial<CircuitBreakerConfig>
+  ) {
     this.store = store;
     this.storage = storage;
     this.shopifyService = new ShopifyService(store);
     this.syncRunManager = new SyncRunManager(storage);
     this.conflictDetection = new ConflictDetectionService(storage);
+    this.errorHandler = new SyncErrorHandler(storage, retryConfig, circuitBreakerConfig);
     this.conflictResolution = new ConflictResolutionService(storage, this.syncRunManager);
   }
 
@@ -212,12 +220,20 @@ export class IdempotentProductSyncService {
     console.log(`Fetching products from Shopify for vendor ${vendor.name}...`);
 
     try {
-      // Fetch all products from Shopify with pagination
-      const allProducts = await this.fetchAllShopifyProducts(vendor, options, syncRunId);
+      // Fetch all products from Shopify with pagination (with retry logic)
+      const allProducts = await this.errorHandler.executeWithRetry(
+        () => this.fetchAllShopifyProducts(vendor, options, syncRunId),
+        `fetch-shopify-products-${vendor.id}`,
+        { vendorId: vendor.id, vendorName: vendor.name }
+      );
       stats.productsFound = allProducts.length;
 
-      // Update sync run with products found
-      await this.syncRunManager.setProductsFound(syncRunId, stats.productsFound);
+      // Update sync run with products found (with retry for database operations)
+      await this.errorHandler.executeWithRetry(
+        () => this.syncRunManager.setProductsFound(syncRunId, stats.productsFound),
+        `update-sync-run-${syncRunId}`,
+        { syncRunId, productsFound: stats.productsFound }
+      );
 
       console.log(`Processing ${stats.productsFound} products with idempotent operations...`);
 
@@ -226,11 +242,14 @@ export class IdempotentProductSyncService {
         const productStartTime = Date.now();
         
         try {
-          const result = await this.processShopifyProduct(
-            shopifyProduct,
-            vendor,
-            options,
-            syncRunId
+          const result = await this.errorHandler.executeWithRetry(
+            () => this.processShopifyProduct(shopifyProduct, vendor, options, syncRunId),
+            `process-product-${this.extractSku(shopifyProduct)}`,
+            { 
+              productId: shopifyProduct.id,
+              productTitle: shopifyProduct.title,
+              vendorId: vendor.id 
+            }
           );
 
           // Update statistics
@@ -260,32 +279,58 @@ export class IdempotentProductSyncService {
           rateLimitHits += result.rateLimitHits || 0;
           totalResponseTime += processingTime;
 
-          // Record API call metrics
+          // Record API call metrics (with retry for database operations)
           if (result.apiCallsUsed || 0 > 0) {
-            await this.syncRunManager.recordApiCall(
-              syncRunId,
-              processingTime,
-              (result.rateLimitHits || 0) > 0
+            await this.errorHandler.executeWithRetry(
+              () => this.syncRunManager.recordApiCall(
+                syncRunId,
+                processingTime,
+                (result.rateLimitHits || 0) > 0
+              ),
+              `record-api-call-${syncRunId}`,
+              { syncRunId, processingTime, rateLimitHit: (result.rateLimitHits || 0) > 0 }
             );
           }
 
         } catch (productError) {
-          const errorMessage = `Failed to process product ${shopifyProduct.title}: ${
-            productError instanceof Error ? productError.message : 'Unknown error'
-          }`;
+          // Handle RetryExhaustedError to preserve classification information
+          let syncError: SyncError;
+          if (productError instanceof RetryExhaustedError) {
+            syncError = productError.syncError;
+          } else {
+            syncError = this.errorHandler.classifyError(productError);
+          }
           
-          console.error(errorMessage);
+          const errorMessage = `Failed to process product ${shopifyProduct.title}: ${syncError.message}`;
+          
+          console.error(`[${syncError.type.toUpperCase()}] ${errorMessage}`, {
+            severity: syncError.severity,
+            retryable: syncError.retryable,
+            productId: shopifyProduct.id,
+            attempts: productError instanceof RetryExhaustedError ? productError.attempts : 1
+          });
+          
           errors.push(errorMessage);
           stats.productsFailed++;
 
-          // Record failed product sync event
-          await this.syncRunManager.recordProductSyncEvent(syncRunId, {
-            sku: this.extractSku(shopifyProduct),
-            eventType: 'error',
-            operation: 'fetch',
-            errorMessage,
-            processingTimeMs: Date.now() - productStartTime
-          });
+          // Record failed product sync event (with retry for database operations)
+          try {
+            await this.errorHandler.executeWithRetry(
+              () => this.syncRunManager.recordProductSyncEvent(syncRunId, {
+                sku: this.extractSku(shopifyProduct),
+                eventType: 'error',
+                operation: 'fetch',
+                errorMessage: `${syncError.type}: ${syncError.message}`,
+                processingTimeMs: Date.now() - productStartTime,
+                success: false
+              }),
+              `record-error-event-${syncRunId}`,
+              { syncRunId, productId: shopifyProduct.id, errorType: syncError.type }
+            );
+          } catch (eventError) {
+            console.error(`Failed to record sync event for product ${shopifyProduct.id}:`, eventError);
+            // Don't throw here - we want to continue processing other products
+          }
         }
       }
 
@@ -334,12 +379,16 @@ export class IdempotentProductSyncService {
     try {
       // Skip processing if dry run
       if (options.dryRun) {
-        await this.syncRunManager.recordProductSyncEvent(syncRunId, {
-          sku,
-          eventType: 'skip',
-          operation: 'save',
-          skippedReason: 'Dry run mode enabled'
-        });
+        await this.errorHandler.executeWithRetry(
+          () => this.syncRunManager.recordProductSyncEvent(syncRunId, {
+            sku,
+            eventType: 'skip',
+            operation: 'save',
+            skippedReason: 'Dry run mode enabled'
+          }),
+          `record-dryrun-event-${syncRunId}-${sku}`,
+          { syncRunId, sku, dryRun: true }
+        );
         
         return {
           action: 'skipped',
@@ -350,41 +399,45 @@ export class IdempotentProductSyncService {
         };
       }
 
-      // Detect conflicts using our conflict detection service
-      const conflictResult = await this.conflictDetection.detectConflict(
-        sku,
-        shopifyProduct,
-        options.conflictDetection
+      // Detect conflicts using our conflict detection service (with retry logic)
+      const conflictResult = await this.errorHandler.executeWithRetry(
+        () => this.conflictDetection.detectConflict(sku, shopifyProduct, options.conflictDetection),
+        `detect-conflict-${sku}`,
+        { sku, productId: shopifyProduct.id, vendorId: vendor.id }
       );
 
       let action: 'created' | 'updated' | 'skipped' | 'failed' = 'failed';
       let conflictResolved = true;
 
-      // Record conflict detection event  
-      await this.syncRunManager.recordProductSyncEvent(syncRunId, {
-        sku,
-        eventType: conflictResult.hasConflict ? 'conflict' : 'update',
-        operation: 'compare',
-        beforeData: conflictResult.localProduct,
-        afterData: shopifyProduct,
-        changedFields: conflictResult.metadata.changedComponents,
-        conflictReason: conflictResult.conflictReasons.join('; ') || undefined
-      });
+      // Record conflict detection event (with retry logic)
+      await this.errorHandler.executeWithRetry(
+        () => this.syncRunManager.recordProductSyncEvent(syncRunId, {
+          sku,
+          eventType: conflictResult.hasConflict ? 'conflict' : 'update',
+          operation: 'compare',
+          beforeData: conflictResult.localProduct,
+          afterData: shopifyProduct,
+          changedFields: conflictResult.metadata.changedComponents,
+          conflictReason: conflictResult.conflictReasons.join('; ') || undefined
+        }),
+        `record-conflict-event-${syncRunId}-${sku}`,
+        { syncRunId, sku, hasConflict: conflictResult.hasConflict }
+      );
 
       if (conflictResult.hasConflict) {
-        // Resolve conflict using our resolution service
-        const resolutionResult = await this.conflictResolution.resolveConflict(
-          conflictResult,
-          options.resolution,
-          syncRunId
+        // Resolve conflict using our resolution service (with retry logic)
+        const resolutionResult = await this.errorHandler.executeWithRetry(
+          () => this.conflictResolution.resolveConflict(conflictResult, options.resolution, syncRunId),
+          `resolve-conflict-${sku}`,
+          { sku, syncRunId, resolutionStrategy: options.resolution.strategy }
         );
 
         if (resolutionResult.resolved) {
-          // Apply resolution
-          const applyResult = await this.conflictResolution.applyResolution(
-            resolutionResult,
-            sku,
-            syncRunId
+          // Apply resolution (with retry logic)
+          const applyResult = await this.errorHandler.executeWithRetry(
+            () => this.conflictResolution.applyResolution(resolutionResult, sku, syncRunId),
+            `apply-resolution-${sku}`,
+            { sku, syncRunId, resolutionId: resolutionResult.id }
           );
 
           if (applyResult.success) {
@@ -401,17 +454,21 @@ export class IdempotentProductSyncService {
       } else {
         // No conflict - proceed with sync
         if (!conflictResult.localProduct) {
-          // Create new product
+          // Create new product (with retry logic)
           const productData = await this.buildProductDataFromShopify(
             shopifyProduct,
             vendor,
             options
           );
           
-          await this.storage.createProduct(productData);
+          await this.errorHandler.executeWithRetry(
+            () => this.storage.createProduct(productData),
+            `create-product-${sku}`,
+            { sku, vendorId: vendor.id, productTitle: shopifyProduct.title }
+          );
           action = 'created';
         } else {
-          // Update existing product with signature tracking
+          // Update existing product with signature tracking (with retry logic)
           const signatures = computeProductSignatures(shopifyProduct);
           const updates = await this.buildProductUpdatesFromShopify(
             shopifyProduct,
@@ -419,18 +476,26 @@ export class IdempotentProductSyncService {
             signatures
           );
           
-          await this.storage.updateProduct(conflictResult.localProduct.id, updates);
+          await this.errorHandler.executeWithRetry(
+            () => this.storage.updateProduct(conflictResult.localProduct.id, updates),
+            `update-product-${sku}`,
+            { sku, productId: conflictResult.localProduct.id, vendorId: vendor.id }
+          );
           action = 'updated';
         }
 
-        // Record successful sync event
-        await this.syncRunManager.recordProductSyncEvent(syncRunId, {
-          sku,
-          eventType: action === 'created' ? 'create' : 'update',
-          operation: 'save',
-          afterData: shopifyProduct,
-          success: true
-        });
+        // Record successful sync event (with retry logic)
+        await this.errorHandler.executeWithRetry(
+          () => this.syncRunManager.recordProductSyncEvent(syncRunId, {
+            sku,
+            eventType: action === 'created' ? 'create' : 'update',
+            operation: 'save',
+            afterData: shopifyProduct,
+            success: true
+          }),
+          `record-success-event-${syncRunId}-${sku}`,
+          { syncRunId, sku, action }
+        );
       }
 
       return {
@@ -627,5 +692,40 @@ export class IdempotentProductSyncService {
       default:
         return 'active';
     }
+  }
+
+  /**
+   * Gets circuit breaker metrics for monitoring and alerting
+   */
+  getCircuitBreakerMetrics(): Record<string, any> {
+    return this.errorHandler.getCircuitBreakerMetrics();
+  }
+
+  /**
+   * Resets circuit breaker for specific operation (for manual intervention)
+   */
+  resetCircuitBreaker(operationKey: string): void {
+    this.errorHandler.resetCircuitBreaker(operationKey);
+  }
+
+  /**
+   * Gets current retry configuration
+   */
+  getRetryConfiguration(): RetryConfig {
+    return this.errorHandler.getRetryConfig();
+  }
+
+  /**
+   * Updates retry configuration for enhanced error handling
+   */
+  updateRetryConfiguration(config: Partial<RetryConfig>): void {
+    this.errorHandler.updateRetryConfig(config);
+  }
+
+  /**
+   * Provides error classification for external error analysis
+   */
+  classifyError(error: any): SyncError {
+    return this.errorHandler.classifyError(error);
   }
 }
