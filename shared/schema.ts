@@ -115,6 +115,12 @@ export const products = pgTable("products", {
   shopifyUpdatedAt: timestamp("shopify_updated_at"), // Track when Shopify last updated this product
   localChanges: jsonb("local_changes"), // Track what fields were changed locally
   syncConflict: boolean("sync_conflict").default(false), // Both local and Shopify changed since last sync
+  // Product signature hashing for change detection and idempotency
+  contentHash: varchar("content_hash"), // SHA-256 hash of core product data (name, description, price)
+  variantsHash: varchar("variants_hash"), // Hash of variants data for change detection
+  imagesHash: varchar("images_hash"), // Hash of images data for change detection
+  lastHashedAt: timestamp("last_hashed_at"), // When hashes were last calculated
+  syncVersion: integer("sync_version").default(1), // Incremental version number for idempotency
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -130,6 +136,73 @@ export const syncJobs = pgTable("sync_jobs", {
   errors: jsonb("errors"),
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Detailed sync run tracking with lineage and idempotency
+export const syncRuns = pgTable("sync_runs", {
+  id: serial("id").primaryKey(),
+  syncJobId: integer("sync_job_id").references(() => syncJobs.id), // Link to parent job
+  vendorId: integer("vendor_id").notNull().references(() => vendors.id),
+  storeId: integer("store_id").notNull().references(() => stores.id),
+  runId: varchar("run_id").notNull().unique(), // UUID for idempotency
+  syncType: varchar("sync_type").notNull(), // "pull", "push", "bidirectional"
+  direction: varchar("direction").notNull(), // "shopify_to_local", "local_to_shopify"
+  batchSize: integer("batch_size").default(50),
+  pageInfo: varchar("page_info"), // For pagination continuation
+  status: varchar("status").default("pending"), // pending, running, completed, failed, cancelled
+  // Result tracking
+  productsFound: integer("products_found").default(0),
+  productsProcessed: integer("products_processed").default(0),
+  productsCreated: integer("products_created").default(0),
+  productsUpdated: integer("products_updated").default(0),
+  productsFailed: integer("products_failed").default(0),
+  productsSkipped: integer("products_skipped").default(0), // Skipped due to no changes
+  // Rate limiting and performance
+  apiCallsMade: integer("api_calls_made").default(0),
+  rateLimitHits: integer("rate_limit_hits").default(0),
+  avgResponseTime: integer("avg_response_time"), // Average API response time in ms
+  // Error and conflict tracking
+  errors: jsonb("errors"), // Array of error details
+  conflicts: jsonb("conflicts"), // Array of conflict details
+  warnings: jsonb("warnings"), // Array of warning details
+  // Timestamps and lineage
+  parentRunId: varchar("parent_run_id"), // For retry/continuation lineage
+  retriedFromRunId: varchar("retried_from_run_id"), // If this is a retry
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Individual product sync event tracking
+export const productSyncEvents = pgTable("product_sync_events", {
+  id: serial("id").primaryKey(),
+  syncRunId: integer("sync_run_id").notNull().references(() => syncRuns.id),
+  productId: integer("product_id").references(() => products.id),
+  sku: varchar("sku").notNull(), // Always track SKU even if product doesn't exist yet
+  shopifyProductId: varchar("shopify_product_id"),
+  eventType: varchar("event_type").notNull(), // "create", "update", "skip", "error", "conflict"
+  operation: varchar("operation").notNull(), // "fetch", "compare", "hash", "save", "upload"
+  // Change detection
+  oldContentHash: varchar("old_content_hash"),
+  newContentHash: varchar("new_content_hash"),
+  oldSyncVersion: integer("old_sync_version"),
+  newSyncVersion: integer("new_sync_version"),
+  changedFields: jsonb("changed_fields"), // Array of field names that changed
+  // Data snapshots
+  beforeData: jsonb("before_data"), // Product data before sync
+  afterData: jsonb("after_data"), // Product data after sync
+  shopifyData: jsonb("shopify_data"), // Raw Shopify API response
+  // Result and error tracking
+  success: boolean("success").default(true),
+  errorMessage: text("error_message"),
+  errorCode: varchar("error_code"),
+  conflictReason: varchar("conflict_reason"), // Why there was a conflict
+  skippedReason: varchar("skipped_reason"), // Why it was skipped
+  // Performance tracking
+  processingTimeMs: integer("processing_time_ms"),
+  apiCallsUsed: integer("api_calls_used").default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -244,7 +317,7 @@ export const productsRelations = relations(products, ({ one }) => ({
   }),
 }));
 
-export const syncJobsRelations = relations(syncJobs, ({ one }) => ({
+export const syncJobsRelations = relations(syncJobs, ({ one, many }) => ({
   vendor: one(vendors, {
     fields: [syncJobs.vendorId],
     references: [vendors.id],
@@ -252,6 +325,34 @@ export const syncJobsRelations = relations(syncJobs, ({ one }) => ({
   store: one(stores, {
     fields: [syncJobs.storeId],
     references: [stores.id],
+  }),
+  syncRuns: many(syncRuns),
+}));
+
+export const syncRunsRelations = relations(syncRuns, ({ one, many }) => ({
+  syncJob: one(syncJobs, {
+    fields: [syncRuns.syncJobId],
+    references: [syncJobs.id],
+  }),
+  vendor: one(vendors, {
+    fields: [syncRuns.vendorId],
+    references: [vendors.id],
+  }),
+  store: one(stores, {
+    fields: [syncRuns.storeId],
+    references: [stores.id],
+  }),
+  productSyncEvents: many(productSyncEvents),
+}));
+
+export const productSyncEventsRelations = relations(productSyncEvents, ({ one }) => ({
+  syncRun: one(syncRuns, {
+    fields: [productSyncEvents.syncRunId],
+    references: [syncRuns.id],
+  }),
+  product: one(products, {
+    fields: [productSyncEvents.productId],
+    references: [products.id],
   }),
 }));
 
@@ -355,6 +456,17 @@ export const insertSyncJobSchema = createInsertSchema(syncJobs).omit({
   createdAt: true,
 });
 
+export const insertSyncRunSchema = createInsertSchema(syncRuns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProductSyncEventSchema = createInsertSchema(productSyncEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertActivitySchema = createInsertSchema(activities).omit({
   id: true,
   createdAt: true,
@@ -397,6 +509,10 @@ export type UpdateProduct = z.infer<typeof updateProductSchema>;
 export type Product = typeof products.$inferSelect;
 export type InsertSyncJob = z.infer<typeof insertSyncJobSchema>;
 export type SyncJob = typeof syncJobs.$inferSelect;
+export type InsertSyncRun = z.infer<typeof insertSyncRunSchema>;
+export type SyncRun = typeof syncRuns.$inferSelect;
+export type InsertProductSyncEvent = z.infer<typeof insertProductSyncEventSchema>;
+export type ProductSyncEvent = typeof productSyncEvents.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type Activity = typeof activities.$inferSelect;
 export type InsertAiGeneration = z.infer<typeof insertAiGenerationSchema>;

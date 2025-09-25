@@ -5,6 +5,8 @@ import {
   products,
   uploadedProducts,
   syncJobs,
+  syncRuns,
+  productSyncEvents,
   activities,
   aiGenerations,
   pricingBatches,
@@ -19,6 +21,10 @@ import {
   type InsertProduct,
   type SyncJob,
   type InsertSyncJob,
+  type SyncRun,
+  type InsertSyncRun,
+  type ProductSyncEvent,
+  type InsertProductSyncEvent,
   type Activity,
   type InsertActivity,
   type AiGeneration,
@@ -69,6 +75,19 @@ export interface IStorage {
   getSyncJobs(vendorId?: number): Promise<SyncJob[]>;
   createSyncJob(syncJob: InsertSyncJob): Promise<SyncJob>;
   updateSyncJob(id: number, updates: Partial<InsertSyncJob>): Promise<SyncJob>;
+  
+  // Sync run lineage operations
+  getSyncRuns(syncJobId?: number, vendorId?: number): Promise<SyncRun[]>;
+  getSyncRun(id: number): Promise<SyncRun | undefined>;
+  getSyncRunByRunId(runId: string): Promise<SyncRun | undefined>;
+  createSyncRun(syncRun: InsertSyncRun): Promise<SyncRun>;
+  updateSyncRun(id: number, updates: Partial<InsertSyncRun>): Promise<SyncRun>;
+  
+  // Product sync event operations
+  getProductSyncEvents(syncRunId: number): Promise<ProductSyncEvent[]>;
+  getProductSyncEventsBySku(sku: string, limit?: number): Promise<ProductSyncEvent[]>;
+  createProductSyncEvent(event: InsertProductSyncEvent): Promise<ProductSyncEvent>;
+  getLatestProductSyncEvent(sku: string): Promise<ProductSyncEvent | undefined>;
   
   // Activity operations
   getActivities(userId: string, limit?: number): Promise<Activity[]>;
@@ -215,7 +234,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProductByShopifyId(shopifyId: string): Promise<Product | undefined> {
-    const [product] = await db.select().from(products).where(eq(products.shopifyId, shopifyId));
+    const [product] = await db.select().from(products).where(eq(products.shopifyProductId, shopifyId));
     return product;
   }
 
@@ -291,6 +310,76 @@ export class DatabaseStorage implements IStorage {
       .where(eq(syncJobs.id, id))
       .returning();
     return updatedSyncJob;
+  }
+
+  // Sync run lineage operations
+  async getSyncRuns(syncJobId?: number, vendorId?: number): Promise<SyncRun[]> {
+    if (syncJobId && vendorId) {
+      return await db.select().from(syncRuns)
+        .where(and(eq(syncRuns.syncJobId, syncJobId), eq(syncRuns.vendorId, vendorId)))
+        .orderBy(desc(syncRuns.createdAt));
+    } else if (syncJobId) {
+      return await db.select().from(syncRuns)
+        .where(eq(syncRuns.syncJobId, syncJobId))
+        .orderBy(desc(syncRuns.createdAt));
+    } else if (vendorId) {
+      return await db.select().from(syncRuns)
+        .where(eq(syncRuns.vendorId, vendorId))
+        .orderBy(desc(syncRuns.createdAt));
+    }
+    
+    return await db.select().from(syncRuns).orderBy(desc(syncRuns.createdAt));
+  }
+
+  async getSyncRun(id: number): Promise<SyncRun | undefined> {
+    const [syncRun] = await db.select().from(syncRuns).where(eq(syncRuns.id, id));
+    return syncRun;
+  }
+
+  async getSyncRunByRunId(runId: string): Promise<SyncRun | undefined> {
+    const [syncRun] = await db.select().from(syncRuns).where(eq(syncRuns.runId, runId));
+    return syncRun;
+  }
+
+  async createSyncRun(syncRun: InsertSyncRun): Promise<SyncRun> {
+    const [newSyncRun] = await db.insert(syncRuns).values(syncRun).returning();
+    return newSyncRun;
+  }
+
+  async updateSyncRun(id: number, updates: Partial<InsertSyncRun>): Promise<SyncRun> {
+    const [updatedSyncRun] = await db
+      .update(syncRuns)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(syncRuns.id, id))
+      .returning();
+    return updatedSyncRun;
+  }
+
+  // Product sync event operations
+  async getProductSyncEvents(syncRunId: number): Promise<ProductSyncEvent[]> {
+    return await db.select().from(productSyncEvents)
+      .where(eq(productSyncEvents.syncRunId, syncRunId))
+      .orderBy(desc(productSyncEvents.createdAt));
+  }
+
+  async getProductSyncEventsBySku(sku: string, limit = 50): Promise<ProductSyncEvent[]> {
+    return await db.select().from(productSyncEvents)
+      .where(eq(productSyncEvents.sku, sku))
+      .orderBy(desc(productSyncEvents.createdAt))
+      .limit(limit);
+  }
+
+  async createProductSyncEvent(event: InsertProductSyncEvent): Promise<ProductSyncEvent> {
+    const [newEvent] = await db.insert(productSyncEvents).values(event).returning();
+    return newEvent;
+  }
+
+  async getLatestProductSyncEvent(sku: string): Promise<ProductSyncEvent | undefined> {
+    const [event] = await db.select().from(productSyncEvents)
+      .where(eq(productSyncEvents.sku, sku))
+      .orderBy(desc(productSyncEvents.createdAt))
+      .limit(1);
+    return event;
   }
 
   // Activity operations
